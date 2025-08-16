@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}Tableau de bord{% endblock %}
+
+{% block head %}
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 class="page-title mb-1">Tableau de bord</h1>
+    <div class="text-muted small">Mise à jour temps réel • <span id="nowLabel"></span></div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <a class="btn btn-primary" href="/attendance/scan">
+      <i class="bi bi-box-arrow-in-right me-1"></i> Pointer
+    </a>
+    <a class="btn btn-outline-primary" href="/qr/attendance?action=checkin">
+      <i class="bi bi-qr-code-scan me-1"></i> QR Check-in
+    </a>
+    <a class="btn btn-outline-primary" href="/qr/attendance?action=checkout">
+      <i class="bi bi-qr-code me-1"></i> QR Check-out
+    </a>
+    <a class="btn btn-outline-success" href="/exports/report.pdf">
+      <i class="bi bi-filetype-pdf me-1"></i> Rapport PDF
+    </a>
+  </div>
+</div>
+
+<!-- KPIs -->
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon bg-primary-subtle text-primary"><i class="bi bi-people-fill"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Présents (aujourd'hui)</div>
+        <div class="kpi-value" id="kpi-present">—</div>
+        <div class="kpi-sub" id="kpi-present-sub">Chargement…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon bg-info-subtle text-info"><i class="bi bi-clock-history"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Heures totales (aujourd'hui)</div>
+        <div class="kpi-value" id="kpi-hours">—</div>
+        <div class="kpi-sub" id="kpi-hours-sub">Chargement…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon bg-warning-subtle text-warning"><i class="bi bi-sun"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Congés en attente</div>
+        <div class="kpi-value" id="kpi-leaves-pending">—</div>
+        <div class="kpi-sub"><a href="/leaves/pending" class="link-underline link-underline-opacity-0">Voir la file</a></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card">
+      <div class="kpi-icon bg-danger-subtle text-danger"><i class="bi bi-lightning-charge"></i></div>
+      <div class="kpi-body">
+        <div class="kpi-label">Heures sup en attente</div>
+        <div class="kpi-value" id="kpi-ot-pending">—</div>
+        <div class="kpi-sub"><a href="/overtime/pending" class="link-underline link-underline-opacity-0">Voir la file</a></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="card card-soft h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">Présence — 14 jours</h6>
+        <span class="text-muted small" id="presenceRangeLabel">Derniers 14 jours</span>
+      </div>
+      <div class="card-body">
+        <canvas id="presenceChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-xl-6">
+    <div class="card card-soft h-100">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">Heures sup approuvées — 14 jours</h6>
+        <span class="text-muted small">Derniers 14 jours</span>
+      </div>
+      <div class="card-body">
+        <canvas id="overtimeChart" height="120"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3 mt-1">
+  <div class="col-12">
+    <div class="card card-soft">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">Coûts RH par département — mois en cours</h6>
+        <a class="btn btn-sm btn-outline-secondary" href="/exports/department_costs.csv">
+          <i class="bi bi-download"></i> Export CSV
+        </a>
+      </div>
+      <div class="card-body">
+        <canvas id="deptChart" height="90"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,33 @@
+
+{% extends "base.html" %}
+{% block title %}Validation congés - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Validation des congés (en attente)</h3>
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>#</th><th>Employé</th><th>Type</th><th>Période</th><th>Raison</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for l in items %}
+      <tr>
+        <td>{{ l.id }}</td>
+        <td>{{ l.user.full_name }}</td>
+        <td>{{ l.type.value }}</td>
+        <td>{{ l.start_date }} → {{ l.end_date }}</td>
+        <td>{{ l.reason or '' }}</td>
+        <td>
+          <button class="btn btn-success btn-sm me-1" onclick="setStatus({{l.id}}, 'approved')">Approuver</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="setStatus({{l.id}}, 'rejected')">Rejeter</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+async function setStatus(id, st){
+  const res = await fetch(`/leaves/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: st})});
+  const data = await res.json();
+  if(data.ok) location.reload(); else alert('Erreur');
+}
+</script>
+{% endblock %}

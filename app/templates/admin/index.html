@@ -1,0 +1,14 @@
+
+{% extends "base.html" %}
+{% block title %}Admin - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Administration</h3>
+
+<div class="alert alert-info mb-3">
+  Raccourcis : 
+  <a class="btn btn-sm btn-outline-primary" href="/leaves/pending">Valider congés</a>
+  <a class="btn btn-sm btn-outline-primary" href="/overtime/pending">Valider heures sup</a>
+  <a class="btn btn-sm btn-outline-success" href="/admin/awards/">Employé du mois</a>
+  <a class="btn btn-sm btn-outline-secondary" href="/exports/">Exports</a>
+</div>
+{% endblock %}

@@ -1,0 +1,56 @@
+
+{% extends "base.html" %}
+{% block title %}Mes congés - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Mes congés</h3>
+
+<form method="post" action="/leaves/" class="row g-3 mb-4">
+  <div class="col-md-3">
+    <label class="form-label">Type</label>
+    <select class="form-select" name="type">
+      <option value="annual">Annuel</option>
+      <option value="sick">Maladie</option>
+      <option value="maternity">Maternité</option>
+      <option value="paternity">Paternité</option>
+      <option value="unpaid">Sans solde</option>
+      <option value="other">Autre</option>
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Début</label>
+    <input type="date" class="form-control" name="start_date" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Fin</label>
+    <input type="date" class="form-control" name="end_date" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Raison</label>
+    <input type="text" class="form-control" name="reason" placeholder="(optionnel)">
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary">Demander</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>#</th><th>Type</th><th>Période</th><th>Statut</th><th>Créé</th></tr></thead>
+        <tbody>
+          {% for l in items %}
+          <tr>
+            <td>{{ l.id }}</td>
+            <td>{{ l.type.value }}</td>
+            <td>{{ l.start_date }} → {{ l.end_date }}</td>
+            <td><span class="badge bg-secondary">{{ l.status.value }}</span></td>
+            <td>{{ l.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

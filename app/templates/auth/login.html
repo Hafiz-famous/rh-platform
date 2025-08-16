@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Connexion{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-lg-9 col-xl-8">
+      <div class="card shadow-sm overflow-hidden border-0 rounded-4">
+        <!-- + espace entre colonnes -->
+        <div class="row g-5 align-items-stretch">
+
+          <!-- Colonne formulaire -->
+          <div class="col-12 col-md-6 p-4 p-lg-5 border-end"
+               style="border-color:rgba(16,24,40,.08)!important;">
+            <h2 class="fw-bold mb-4">Connexion</h2>
+
+            {% with messages = get_flashed_messages(with_categories=true) %}
+              {% if messages %}
+                {% for cat, msg in messages %}
+                  <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
+                {% endfor %}
+              {% endif %}
+            {% endwith %}
+
+            <form method="post" action="{{ url_for('auth.login') }}" class="vstack gap-3">
+              <div>
+                <label class="form-label">Email</label>
+                <input type="email" name="email" class="form-control" required
+                       placeholder="votre Email" value="{{ request.form.get('email','') }}">
+              </div>
+              <div>
+                <label class="form-label">Mot de passe</label>
+                <input type="password" name="password" class="form-control" required placeholder="••••••••">
+              </div>
+              <button class="btn btn-primary mt-2 w-100">Se connecter</button>
+            </form>
+
+            {% if config.REGISTER_OPEN %}
+              <div class="text-center mt-2">
+                <a href="{{ url_for('auth.register_form') }}" class="small">Créer un compte</a>
+              </div>
+            {% endif %}
+          </div>
+
+          <!-- Colonne image (titre AU-DESSUS de l'image) -->
+          <div class="col-md-6 d-none d-md-flex flex-column">
+            <!-- Titre bleu au-dessus -->
+            <div class="px-4 pt-4">
+              <div class="text-primary text-uppercase fw-bold fs-2" style="letter-spacing:.08em;">
+                BIENVENUE SUR RH PLATFORM
+              </div>
+            </div>
+
+            <!-- Image -->
+            <div class="flex-fill px-4 pb-4 pt-2">
+              <img
+                src="{{ url_for('static', filename='images/login-hero.jpg') }}"
+                alt="Illustration professionnelle"
+                class="w-100 h-100 object-fit-cover rounded-3">
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

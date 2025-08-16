@@ -1,0 +1,3 @@
+
+<!-- Ajouter dans templates/admin/awards.html (par exemple sous le bloc Exports) -->
+<a class="btn btn-sm btn-primary" href="/exports/report.pdf?month={{ ym }}">Télécharger le rapport PDF ({{ ym }})</a>

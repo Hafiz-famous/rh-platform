@@ -1,0 +1,12 @@
+
+{% extends "base.html" %}
+{% block title %}Exports - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Exports</h3>
+<ul>
+  <li><a href="/exports/attendance.csv">Pointages (CSV)</a></li>
+  <li><a href="/exports/overtime.csv">Heures sup (CSV)</a></li>
+  <li><a href="/exports/leaves.csv">Congés (CSV)</a></li>
+  <li><a href="/exports/department_costs.csv">Coûts par service courant (CSV)</a></li>
+</ul>
+{% endblock %}

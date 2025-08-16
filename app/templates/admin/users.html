@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Utilisateurs{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center justify-content-between mb-3">
+  <h1 class="h4 mb-0">Utilisateurs</h1>
+  <form class="d-flex" method="get">
+    <input name="q" class="form-control form-control-sm me-2" placeholder="Rechercher nom/email" value="{{ request.args.get('q','') }}">
+    <button class="btn btn-sm btn-outline-secondary">Rechercher</button>
+  </form>
+</div>
+
+<div class="card card-soft">
+  <div class="table-responsive">
+    <table class="table align-middle mb-0">
+      <thead>
+        <tr>
+          <th>ID</th><th>Nom</th><th>Email</th><th>Rôle</th><th>Statut</th><th class="text-end">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr data-id="{{u.id}}">
+          <td>{{ u.id }}</td>
+          <td>{{ u.first_name }} {{ u.last_name }}</td>
+          <td>{{ u.email }}</td>
+          <td>
+            <select class="form-select form-select-sm sel-role" {% if u.id == current_user.id %}disabled{% endif %}>
+              {% for r in Role %}
+                <option value="{{ r.name }}" {% if u.role == r %}selected{% endif %}>{{ r.name }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td>
+            {% if u.is_active %}
+              <span class="badge text-bg-success">Actif</span>
+            {% else %}
+              <span class="badge text-bg-secondary">Désactivé</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <button class="btn btn-sm {% if u.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %} btn-toggle"
+                    {% if u.id == current_user.id %}disabled{% endif %}>
+              {% if u.is_active %}Désactiver{% else %}Activer{% endif %}
+            </button>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(() => {
+  const $$ = (s, c=document) => Array.from(c.querySelectorAll(s));
+
+  // Activer/Désactiver
+  $$(".btn-toggle").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const tr = btn.closest("tr");
+      const id = tr.dataset.id;
+      const res = await fetch(`/admin/users/${id}/toggle`, { method:"POST" });
+      const data = await res.json();
+      if (!data.ok) { alert(data.error || "Erreur"); return; }
+      location.reload();
+    });
+  });
+
+  // Changement de rôle
+  $$(".sel-role").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const tr = sel.closest("tr");
+      const id = tr.dataset.id;
+      const form = new FormData(); form.append("role", sel.value);
+      const res = await fetch(`/admin/users/${id}/role`, { method:"POST", body: form });
+      const data = await res.json();
+      if (!data.ok) { alert(data.error || "Erreur"); return; }
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,79 @@
+
+{% extends "base.html" %}
+{% block title %}Employé du mois - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Employé du mois</h3>
+
+<form method="get" class="row g-2 align-items-end mb-3">
+  <div class="col-auto">
+    <label class="form-label">Mois</label>
+    <input type="month" class="form-control" name="month" value="{{ ym }}">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-outline-primary">Charger</button>
+  </div>
+</form>
+
+<form method="post" action="/admin/awards/weights" class="row g-2 align-items-end mb-4">
+  <input type="hidden" name="month" value="{{ ym }}">
+  <div class="col-auto"><label class="form-label">Présence</label>
+    <input name="presence" type="number" step="0.01" class="form-control" value="{{ weights['presence'] if weights['presence'] is not none else 0.5 }}">
+  </div>
+  <div class="col-auto"><label class="form-label">Heures</label>
+    <input name="hours" type="number" step="0.01" class="form-control" value="{{ weights['hours'] if weights['hours'] is not none else 0.3 }}">
+  </div>
+  <div class="col-auto"><label class="form-label">Heures sup</label>
+    <input name="overtime" type="number" step="0.01" class="form-control" value="{{ weights['overtime'] if weights['overtime'] is not none else 0.1 }}">
+  </div>
+  <div class="col-auto"><label class="form-label">Congés (pénalité)</label>
+    <input name="leaves" type="number" step="0.01" class="form-control" value="{{ weights['leaves'] if weights['leaves'] is not none else -0.1 }}">
+  </div>
+  <div class="col-auto">
+    <button class="btn btn-secondary">Enregistrer les pondérations</button>
+  </div>
+</form>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h6 class="mb-3">Top candidats — {{ ym }}</h6>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead>
+          <tr>
+            <th>#</th><th>Employé</th><th>Présence</th><th>Heures</th><th>Heures sup</th><th>Congés</th><th>Score</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in scores[:10] %}
+          <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ s.full_name }}</td>
+            <td>{{ '%d/%d (%.0f%%)'|format(s.present_days, s.workdays, s.presence_rate*100) }}</td>
+            <td>{{ '%.2f'|format(s.total_hours) }}</td>
+            <td>{{ '%.2f'|format(s.overtime_hours) }}</td>
+            <td>{{ s.leave_days }}</td>
+            <td><span class="badge bg-primary">{{ '%.3f'|format(s.score) }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <form method="post" action="/admin/awards/run" class="mt-2">
+      <input type="hidden" name="month" value="{{ ym }}">
+      <button class="btn btn-success">Enregistrer le gagnant du mois</button>
+      {% if winner %}
+        <span class="ms-3">Gagnant enregistré : <strong>{{ winner.user.full_name }}</strong> (score {{ '%.3f'|format(winner.score) }})</span>
+      {% endif %}
+    </form>
+  </div>
+</div>
+
+<div class="alert alert-info">
+  Exports : 
+  <a class="btn btn-sm btn-outline-primary" href="/exports/attendance.csv">pointages</a>
+  <a class="btn btn-sm btn-outline-primary" href="/exports/overtime.csv">heures sup</a>
+  <a class="btn btn-sm btn-outline-primary" href="/exports/leaves.csv">congés</a>
+  <a class="btn btn-sm btn-outline-primary" href="/exports/department_costs.csv?month={{ ym }}">coûts par service ({{ ym }})</a>
+</div>
+
+{% endblock %}

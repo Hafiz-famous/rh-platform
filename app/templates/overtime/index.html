@@ -1,0 +1,45 @@
+
+{% extends "base.html" %}
+{% block title %}Mes heures sup - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Mes heures supplémentaires</h3>
+
+<form method="post" action="/overtime/" class="row g-3 mb-4">
+  <div class="col-md-3">
+    <label class="form-label">Date</label>
+    <input type="date" class="form-control" name="work_date" required>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label">Heures</label>
+    <input type="number" step="0.25" min="0" class="form-control" name="hours" required>
+  </div>
+  <div class="col-md-6">
+    <label class="form-label">Note</label>
+    <input type="text" class="form-control" name="note" placeholder="(optionnel)">
+  </div>
+  <div class="col-12">
+    <button class="btn btn-primary">Déclarer</button>
+  </div>
+</form>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle">
+        <thead><tr><th>#</th><th>Date</th><th>Heures</th><th>Statut</th><th>Créé</th></tr></thead>
+        <tbody>
+          {% for o in items %}
+          <tr>
+            <td>{{ o.id }}</td>
+            <td>{{ o.work_date }}</td>
+            <td>{{ o.hours }}</td>
+            <td><span class="badge bg-secondary">{{ o.status.value }}</span></td>
+            <td>{{ o.created_at }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,33 @@
+
+{% extends "base.html" %}
+{% block title %}Validation heures sup - RH Platform{% endblock %}
+{% block content %}
+<h3 class="mb-3">Validation des heures supplémentaires (en attente)</h3>
+<div class="table-responsive">
+  <table class="table table-sm align-middle">
+    <thead><tr><th>#</th><th>Employé</th><th>Date</th><th>Heures</th><th>Note</th><th>Actions</th></tr></thead>
+    <tbody>
+      {% for o in items %}
+      <tr>
+        <td>{{ o.id }}</td>
+        <td>{{ o.user.full_name }}</td>
+        <td>{{ o.work_date }}</td>
+        <td>{{ o.hours }}</td>
+        <td>{{ o.note or '' }}</td>
+        <td>
+          <button class="btn btn-success btn-sm me-1" onclick="setStatus({{o.id}}, 'APPROVED')">Approuver</button>
+          <button class="btn btn-outline-danger btn-sm" onclick="setStatus({{o.id}}, 'REJECTED')">Rejeter</button>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<script>
+async function setStatus(id, st){
+  const res = await fetch(`/overtime/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: st})});
+  const data = await res.json();
+  if(data.ok) location.reload(); else alert('Erreur');
+}
+</script>
+{% endblock %}

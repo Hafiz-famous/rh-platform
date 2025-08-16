@@ -8,3 +8,6 @@ psycopg[binary]==3.2.*
 qrcode==7.4.2
 Pillow==10.4.0
 alembic
+jinja2
+qrcode
+reportlab

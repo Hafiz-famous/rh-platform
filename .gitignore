@@ -39,3 +39,4 @@ rh.db
 
 # Alembic cache
 migrations/**/__pycache__/
+.vercel

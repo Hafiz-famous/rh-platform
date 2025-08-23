@@ -1,34 +1,62 @@
-
 {% extends "base.html" %}
 {% block title %}Pointer - RH Platform{% endblock %}
+
 {% block content %}
 <h2 class="page-title mb-4">Pointage</h2>
-<div class="row g-3">
+
+<div class="row g-3" data-reveal>
   <div class="col-12 col-lg-8">
     <div class="card card-soft">
       <div class="card-body">
-        <p class="text-muted mb-3">Autorise la géolocalisation si possible.</p>
+        <p class="text-muted mb-3">
+          Autorise la géolocalisation si possible (améliore la fiabilité des pointages).
+        </p>
+
         <div class="d-flex gap-2">
-          <button id="btn-checkin" class="btn btn-success"><i class="bi bi-box-arrow-in-right me-1"></i>Check-in</button>
-          <button id="btn-checkout" class="btn btn-danger"><i class="bi bi-box-arrow-right me-1"></i>Check-out</button>
+          <button id="btn-checkin" class="btn btn-success">
+            <span class="spinner-border spinner-border-sm me-2 d-none" aria-hidden="true"></span>
+            <i class="bi bi-box-arrow-in-right me-1"></i> Check-in
+          </button>
+
+          <button id="btn-checkout" class="btn btn-danger">
+            <span class="spinner-border spinner-border-sm me-2 d-none" aria-hidden="true"></span>
+            <i class="bi bi-box-arrow-right me-1"></i> Check-out
+          </button>
         </div>
+
+        <div class="mt-3 small text-muted" id="geo-status">Géolocalisation : en attente…</div>
       </div>
     </div>
   </div>
+
   <div class="col-12 col-lg-4">
     <div class="card card-soft">
       <div class="card-body small">
         <div class="text-muted mb-2">Liens QR rapides</div>
         <div class="d-grid gap-2">
-          <a class="btn btn-outline-primary" href="/qr/attendance?action=checkin"><i class="bi bi-qr-code-scan me-1"></i>Générer QR Check-in</a>
-          <a class="btn btn-outline-secondary" href="/qr/attendance?action=checkout"><i class="bi bi-qr-code me-1"></i>Générer QR Check-out</a>
+          <a class="btn btn-outline-primary" href="/qr/attendance?action=checkin">
+            <i class="bi bi-qr-code-scan me-1"></i> Générer QR Check-in
+          </a>
+          <a class="btn btn-outline-secondary" href="/qr/attendance?action=checkout">
+            <i class="bi bi-qr-code me-1"></i> Générer QR Check-out
+          </a>
         </div>
       </div>
+    </div>
+  </div>
+</div>
+
+{# conteneur des toasts Bootstrap #}
+<div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1080">
+  <div id="toast-template" class="toast align-items-center text-bg-success border-0" role="alert" aria-live="assertive" aria-atomic="true">
+    <div class="d-flex">
+      <div class="toast-body">Opération réussie.</div>
+      <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Fermer"></button>
     </div>
   </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/attendance.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/attendance.js') }}"></script>
 {% endblock %}

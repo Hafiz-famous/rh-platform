@@ -1,0 +1,8 @@
+Nouvelle demande de congé
+ID: #{{ leave_id }}
+
+Salarié : {{ employee_name }}
+{% if leave_type %}Type : {{ leave_type|replace('_',' ')|title }}{% endif %}
+Période : {{ start_date.strftime('%d/%m/%Y') }} -> {{ end_date.strftime('%d/%m/%Y') }}
+
+Traiter la demande : {{ url }}

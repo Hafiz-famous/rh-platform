@@ -1,0 +1,8 @@
+Bonjour {{ user_name }},
+
+Votre demande de congé du {{ start_date.strftime('%d/%m/%Y') }} au {{ end_date.strftime('%d/%m/%Y') }} a été {{ status }}.
+
+Consulter vos congés : {{ url }}
+ID demande: #{{ leave_id }}
+
+-- RH Platform (ne pas répondre)

@@ -1,0 +1,11 @@
+<!-- app/templates/email/leave_submitted.html -->
+<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif;">
+    <h2>Nouvelle demande de congé</h2>
+    <p><strong>Employé(e) :</strong> {{ employee_name }}</p>
+    <p><strong>Période :</strong> du {{ start_date }} au {{ end_date }}</p>
+    <p>Veuillez valider depuis l'interface RH (menu Congés &gt; En attente).</p>
+    <p style="font-size:12px;color:#666">ID Demande: #{{ leave_id }}</p>
+  </body>
+</html>

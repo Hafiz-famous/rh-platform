@@ -1,112 +1,134 @@
-// app/static/js/attendance.js
-(() => {
-  // -------- utils --------
-  const $ = (s) => document.querySelector(s);
+(function () {
+  const $  = (s, r=document) => r.querySelector(s);
+  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
 
-  // Toast Bootstrap (nécessite <div id="toast-zone" class="toast-container ..."> dans base.html)
-  function showToast(message, variant = "success", delay = 3000) {
-    let zone = $("#toast-zone");
-    if (!zone) {
-      // fallback si le conteneur n'existe pas
-      zone = document.createElement("div");
-      zone.id = "toast-zone";
-      zone.className = "toast-container position-fixed bottom-0 end-0 p-3";
-      document.body.appendChild(zone);
+  const btnIn  = $("#btn-checkin");
+  const btnOut = $("#btn-checkout");
+  const geoLbl = $("#geo-status");
+
+  // Utilitaires
+  function setBusy(btn, busy=true){
+    const sp = btn.querySelector(".spinner-border");
+    if (busy){
+      btn.disabled = true;
+      sp && sp.classList.remove("d-none");
+    } else {
+      btn.disabled = false;
+      sp && sp.classList.add("d-none");
     }
-    const el = document.createElement("div");
-    el.className = `toast align-items-center text-bg-${variant} border-0`;
-    el.setAttribute("role", "alert");
-    el.setAttribute("aria-live", "assertive");
-    el.setAttribute("aria-atomic", "true");
-    el.innerHTML = `
-      <div class="d-flex">
-        <div class="toast-body">${message}</div>
-        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-      </div>`;
-    zone.appendChild(el);
-    const t = new bootstrap.Toast(el, { delay });
+  }
+
+  function toast(message, {ok=true}={}){
+    const tpl = $("#toast-template").cloneNode(true);
+    tpl.id = "";
+    tpl.classList.remove("show");
+    tpl.classList.toggle("text-bg-success", ok);
+    tpl.classList.toggle("text-bg-danger", !ok);
+    tpl.querySelector(".toast-body").textContent = message;
+    $(".toast-container").appendChild(tpl);
+
+    // Bootstrap toast
+    const t = new bootstrap.Toast(tpl, { delay: 3500 });
     t.show();
-    el.addEventListener("hidden.bs.toast", () => el.remove());
+    tpl.addEventListener("hidden.bs.toast", ()=> tpl.remove());
   }
 
-  // Bouton -> spinner + disabled
-  function setBusy(btn, busy) {
-    if (!btn) return;
-    btn.disabled = !!busy;
-    if (busy) {
-      if (!btn.dataset.originalHtml) btn.dataset.originalHtml = btn.innerHTML;
-      btn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>${btn.dataset.originalHtml}`;
-    } else if (btn.dataset.originalHtml) {
-      btn.innerHTML = btn.dataset.originalHtml;
-      delete btn.dataset.originalHtml;
-    }
-  }
-
-  // Géoloc promesse (lat/lon null si indispo)
-  window.rhUtils = window.rhUtils || {};
-  window.rhUtils.getPosition = function getPosition() {
-    return new Promise((resolve) => {
-      if (!("geolocation" in navigator)) return resolve({ lat: null, lon: null });
-      navigator.geolocation.getCurrentPosition(
-        (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-        ()    => resolve({ lat: null, lon: null }),
-        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-      );
-    });
-  };
-
-  // -------- logique de pointage --------
-  const btnIn  = $("#btn-checkin")  || $("#btnCheckIn");
-  const btnOut = $("#btn-checkout") || $("#btnCheckOut");
-
-  async function punch(action, btn) {
-    try {
-      setBusy(btn, true);
-
-      const { lat, lon } = await window.rhUtils.getPosition();
-      const params = new URLSearchParams(window.location.search);
-      const token = params.get("token");
-
-      const payload = { action, lat, lon };
-      if (token) payload.token = token;
-
-      const res = await fetch("/attendance/punch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-
-      let data = {};
-      try { data = await res.json(); } catch { /* ignore */ }
-
-      if (!res.ok || !data.ok) {
-        const msg = (data && data.error) ? data.error : `Erreur pointage (${res.status})`;
-        showToast(msg, "danger", 4000);
+  // Geolocation (promise + timeout)
+  function getLocation(timeoutMs = 8000){
+    return new Promise(resolve => {
+      if (!("geolocation" in navigator)){
+        resolve({ ok:false, reason:"unsupported" });
         return;
       }
+      let done = false;
+      const timer = setTimeout(()=>{
+        if (!done){ done = true; resolve({ ok:false, reason:"timeout" }); }
+      }, timeoutMs);
 
-      // Succès : toast, rafraîchit dashboard (autre onglet), redirige en douceur
-      showToast(`Pointage ${action} OK (id ${data.attendance_id})`, "success");
-      localStorage.setItem("rh_refresh", Date.now().toString());
-      setTimeout(() => { window.location.href = "/"; }, 900);
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          if (done) return;
+          clearTimeout(timer);
+          done = true;
+          const {latitude, longitude, accuracy} = pos.coords;
+          resolve({ ok:true, lat:latitude, lng:longitude, accuracy });
+        },
+        err => {
+          if (done) return;
+          clearTimeout(timer);
+          done = true;
+          resolve({ ok:false, reason: err.code === 1 ? "denied" : "error" });
+        },
+        { enableHighAccuracy:true, maximumAge: 30_000, timeout: timeoutMs }
+      );
+    });
+  }
 
-      // anti double-clic simple
-      if (action === "checkin"  && btnIn)  btnIn.disabled  = true;
-      if (action === "checkout" && btnOut) btnOut.disabled = true;
+  // Affiche l’état geo initial (non bloquant)
+  (async function initGeo(){
+    const res = await getLocation(1); // 1ms -> lit le cache s'il existe
+    if (res.ok){
+      geoLbl.textContent = `Géolocalisation : ${res.lat.toFixed(5)}, ${res.lng.toFixed(5)} (±${Math.round(res.accuracy)}m)`;
+    } else {
+      geoLbl.textContent = "Géolocalisation : non disponible (sera tentée au moment du pointage)";
+    }
+  })();
 
-    } catch (e) {
-      showToast("Erreur réseau, réessayez.", "danger");
+  // Appel API — adapte l’URL si besoin
+  async function sendMark(action, coords){
+    // On cible par défaut une API JSON /attendance/api/mark ; si tu as un autre endpoint, change ici.
+    const url = "/attendance/api/mark";
+    const body = {
+      action,
+      lat:  coords?.lat ?? null,
+      lng:  coords?.lng ?? null,
+      accuracy: coords?.accuracy ?? null,
+      at:   new Date().toISOString()
+    };
+
+    const r = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "include"
+    });
+
+    // On accepte application/json ou text/json
+    const ct = r.headers.get("content-type") || "";
+    const data = ct.includes("json") ? await r.json().catch(()=>({})) : {};
+    if (!r.ok || data.ok === false){
+      const msg = data.message || `Erreur ${r.status}`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  async function handleAction(action, btn){
+    try {
+      setBusy(btn, true);
+      // Essaye d’obtenir une position (mais ne bloque pas le pointage si KO)
+      const geo = await getLocation();
+      if (geo.ok){
+        geoLbl.textContent = `Géolocalisation : ${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)} (±${Math.round(geo.accuracy)}m)`;
+      } else {
+        const reasons = {timeout:"temps dépassé", denied:"refusée", unsupported:"non supportée", error:"erreur"};
+        geoLbl.textContent = `Géolocalisation : ${reasons[geo.reason] || "indisponible"}`;
+      }
+
+      const payload = await sendMark(action, geo.ok ? geo : null);
+      const label = action === "checkin" ? "Check-in" : "Check-out";
+      toast(`${label} enregistré ✅`, {ok:true});
+
+      // Si l’API renvoie la durée/heure, tu peux mettre à jour des KPIs locaux ici.
+
+    } catch (e){
+      console.error(e);
+      toast(e.message || "Erreur lors du pointage", {ok:false});
     } finally {
       setBusy(btn, false);
     }
   }
 
-  btnIn  && btnIn.addEventListener("click",  () => punch("checkin",  btnIn));
-  btnOut && btnOut.addEventListener("click", () => punch("checkout", btnOut));
-
-  // Bonus : Ctrl+Enter = checkin, Shift+Enter = checkout
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && e.ctrlKey && btnIn)  punch("checkin",  btnIn);
-    if (e.key === "Enter" && e.shiftKey && btnOut) punch("checkout", btnOut);
-  });
+  btnIn?.addEventListener("click", ()=> handleAction("checkin", btnIn));
+  btnOut?.addEventListener("click", ()=> handleAction("checkout", btnOut));
 })();

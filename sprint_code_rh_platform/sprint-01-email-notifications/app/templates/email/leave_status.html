@@ -1,0 +1,11 @@
+<!-- app/templates/email/leave_status.html -->
+<!doctype html>
+<html>
+  <body style="font-family: Arial, sans-serif;">
+    <h2>Mise à jour de votre demande de congé</h2>
+    <p>Bonjour {{ user_name }},</p>
+    <p>Votre demande pour la période du {{ start_date }} au {{ end_date }} est maintenant
+       <strong>{{ status|upper }}</strong>.</p>
+    <p style="font-size:12px;color:#666">ID Demande: #{{ leave_id }}</p>
+  </body>
+</html>

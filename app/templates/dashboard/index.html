@@ -3,6 +3,63 @@
 
 {% block head %}
   <!-- Chart.js -->
+   <style>
+  :root{
+    --radius:16px;
+    --shadow:0 2px 8px rgba(16,24,40,.06), 0 1px 2px rgba(16,24,40,.04);
+    --shadow-lg:0 12px 24px rgba(16,24,40,.14), 0 6px 10px rgba(16,24,40,.08);
+  }
+
+  /* Cartes “soft” + KPIs : micro-animations, 3D tilt via variables CSS */
+  .card.card-soft, .kpi-card{
+    border: none;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    transition: transform .28s cubic-bezier(.22,.61,.36,1), box-shadow .28s, background .2s;
+    transform: translateZ(0) rotateX(var(--rx,0)) rotateY(var(--ry,0)) translateY(var(--tz,0));
+    will-change: transform, box-shadow;
+    background: #fff;
+  }
+  .card.card-soft:hover, .kpi-card:hover{
+    --tz: -4px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* KPI icon animation au survol */
+  .kpi-card .kpi-icon{
+    transition: transform .28s;
+  }
+  .kpi-card:hover .kpi-icon{ transform: scale(1.08) rotate(-2deg); }
+
+  /* EOM trophée avec léger bounce au hover */
+  #eom-card .bi-trophy-fill{
+    transition: transform .35s cubic-bezier(.2,.8,.2,1);
+  }
+  #eom-card:hover .bi-trophy-fill{ transform: translateY(-2px) rotate(-6deg) scale(1.06); }
+
+  /* Révélation au scroll */
+  [data-reveal]{
+    opacity: 0; transform: translateY(10px);
+    transition: opacity .5s ease, transform .5s ease;
+  }
+  [data-reveal].in-view{ opacity: 1; transform: none; }
+
+  /* Effet ripple (clic) sur .btn et .kpi-card */
+  .ripple-host{ position: relative; overflow: hidden; }
+  .ripple{
+    position:absolute; border-radius:50%; pointer-events:none; inset:auto;
+    transform: scale(0); opacity:.32; background: currentColor;
+    animation: ripple .6s ease-out;
+    mix-blend-mode: multiply;
+  }
+  @keyframes ripple{ to{ transform: scale(12); opacity:0; } }
+
+  /* Accessibilité : désactive les animations si l’utilisateur préfère réduire */
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+  }
+</style>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 {% endblock %}
 
@@ -28,6 +85,29 @@
     </a>
   </div>
 </div>
+
+{# ——— EMPLOYÉ·E DU MOIS ——— #}
+{% set _eom = employee_of_month or {} %}
+{% set _name = eom_name or _eom.name %}
+{% if _name %}
+<div class="card card-soft mb-3 border-success-subtle" id="eom-card">
+  <div class="card-body d-flex align-items-center gap-3">
+    <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
+         style="width:44px;height:44px;">
+      <i class="bi bi-trophy-fill"></i>
+    </div>
+    <div class="me-auto">
+      <div class="text-muted text-uppercase small fw-semibold">Employé·e du mois</div>
+      <div class="h5 mb-0" id="eom-name">{{ _name }}</div>
+      <div class="text-muted small" id="eom-meta">
+        {{ _eom.department|default('—') }} · {{ _eom.period_label|default('') }}
+      </div>
+    </div>
+    <a class="btn btn-sm btn-outline-secondary" href="/users/{{ employee_of_month.user_id }}">Profil</a>
+    </a>
+  </div>
+</div>
+{% endif %}
 
 <!-- KPIs -->
 <div class="row g-3 mb-3">

@@ -1,0 +1,61 @@
+<!-- app/templates/costs/index.html -->
+{% extends "base.html" %}
+{% block title %}Coûts par département{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">Coûts par département</h1>
+
+  <form id="period-form" class="row g-2 mb-4">
+    <div class="col-auto">
+      <label for="period" class="col-form-label">Période (YYYY-MM)</label>
+    </div>
+    <div class="col-auto">
+      <input type="month" id="period" class="form-control" value="{{ year }}-{{ '%02d' % month }}">
+    </div>
+    <div class="col-auto">
+      <button class="btn btn-primary" type="submit">Charger</button>
+    </div>
+  </form>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Budget vs Réel</h5>
+          <canvas id="costsChart"></canvas>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card">
+        <div class="card-body">
+          <h5 class="card-title">Totaux</h5>
+          <ul id="totals" class="list-unstyled m-0"></ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-body">
+      <h5 class="card-title">Détail par département</h5>
+      <div class="table-responsive">
+        <table class="table table-sm table-hover align-middle" id="costsTable">
+          <thead>
+            <tr>
+              <th>Code</th><th>Département</th><th>Budget</th>
+              <th>Réel + frais</th><th>Écart</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Chart.js CDN (simple) -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{{ url_for('static', filename='js/costs.js') }}"></script>
+{% endblock %}

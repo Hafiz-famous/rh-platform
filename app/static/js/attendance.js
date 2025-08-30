@@ -1,134 +1,123 @@
-(function () {
-  const $  = (s, r=document) => r.querySelector(s);
-  const $$ = (s, r=document) => Array.from(r.querySelectorAll(s));
+// app/static/js/attendance.js
+(() => {
+  "use strict";
 
-  const btnIn  = $("#btn-checkin");
-  const btnOut = $("#btn-checkout");
-  const geoLbl = $("#geo-status");
+  const $ = (s, r = document) => r.querySelector(s);
 
-  // Utilitaires
-  function setBusy(btn, busy=true){
-    const sp = btn.querySelector(".spinner-border");
-    if (busy){
-      btn.disabled = true;
-      sp && sp.classList.remove("d-none");
-    } else {
-      btn.disabled = false;
-      sp && sp.classList.add("d-none");
+  // Fallback ESGIS Avedji (remplace les coords si besoin)
+  const DEFAULT_COORDS = {
+    lat: 6.1723,   // <-- mets vos coordonnées exactes ici si nécessaire
+    lon: 1.2103,
+    label: "ESGIS Avedji (fallback)"
+  };
+
+  let coords = null; // {lat, lon}
+
+  function setStatus(txt) {
+    const el = $("#geoLabel");
+    if (el) el.textContent = txt;
+  }
+
+  function showToast(msg, ok = true) {
+    try {
+      const tpl = document.getElementById("toast-template");
+      if (!tpl) return alert(msg);
+      const toast = tpl.cloneNode(true);
+      toast.id = "";
+      toast.classList.toggle("text-bg-success", ok);
+      toast.classList.toggle("text-bg-danger", !ok);
+      toast.querySelector(".toast-body").textContent = msg;
+      document.querySelector(".toast-container").appendChild(toast);
+      if (window.bootstrap?.Toast) new bootstrap.Toast(toast, { delay: 2500 }).show();
+      else alert(msg);
+    } catch {
+      alert(msg);
     }
   }
 
-  function toast(message, {ok=true}={}){
-    const tpl = $("#toast-template").cloneNode(true);
-    tpl.id = "";
-    tpl.classList.remove("show");
-    tpl.classList.toggle("text-bg-success", ok);
-    tpl.classList.toggle("text-bg-danger", !ok);
-    tpl.querySelector(".toast-body").textContent = message;
-    $(".toast-container").appendChild(tpl);
+  async function punch(action) {
+    const btn = action === "checkin" ? $("#btn-checkin") : $("#btn-checkout");
+    const sp  = btn?.querySelector(".spinner-border");
+    sp?.classList.remove("d-none"); btn?.setAttribute("disabled", "disabled");
 
-    // Bootstrap toast
-    const t = new bootstrap.Toast(tpl, { delay: 3500 });
-    t.show();
-    tpl.addEventListener("hidden.bs.toast", ()=> tpl.remove());
-  }
+    try {
+      const token = new URLSearchParams(location.search).get("t") || null;
+      const res = await fetch("/attendance/punch", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json", "Accept": "application/json" },
+        body: JSON.stringify({
+          action,
+          lat: coords?.lat ?? null,
+          lon: coords?.lon ?? null,
+          token
+        })
+      });
 
-  // Geolocation (promise + timeout)
-  function getLocation(timeoutMs = 8000){
-    return new Promise(resolve => {
-      if (!("geolocation" in navigator)){
-        resolve({ ok:false, reason:"unsupported" });
-        return;
-      }
-      let done = false;
-      const timer = setTimeout(()=>{
-        if (!done){ done = true; resolve({ ok:false, reason:"timeout" }); }
-      }, timeoutMs);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || `Erreur ${res.status}`);
 
-      navigator.geolocation.getCurrentPosition(
-        pos => {
-          if (done) return;
-          clearTimeout(timer);
-          done = true;
-          const {latitude, longitude, accuracy} = pos.coords;
-          resolve({ ok:true, lat:latitude, lng:longitude, accuracy });
-        },
-        err => {
-          if (done) return;
-          clearTimeout(timer);
-          done = true;
-          resolve({ ok:false, reason: err.code === 1 ? "denied" : "error" });
-        },
-        { enableHighAccuracy:true, maximumAge: 30_000, timeout: timeoutMs }
-      );
-    });
-  }
-
-  // Affiche l’état geo initial (non bloquant)
-  (async function initGeo(){
-    const res = await getLocation(1); // 1ms -> lit le cache s'il existe
-    if (res.ok){
-      geoLbl.textContent = `Géolocalisation : ${res.lat.toFixed(5)}, ${res.lng.toFixed(5)} (±${Math.round(res.accuracy)}m)`;
-    } else {
-      geoLbl.textContent = "Géolocalisation : non disponible (sera tentée au moment du pointage)";
+      showToast(action === "checkin" ? "Check-in réussi ✅" : "Check-out réussi ✅", true);
+      // Optionnel: rafraîchir d'autres onglets du dashboard
+      try { localStorage.setItem("rh_refresh", String(Date.now())); } catch {}
+    } catch (e) {
+      showToast(`Échec: ${e.message || e}`, false);
+    } finally {
+      sp?.classList.add("d-none"); btn?.removeAttribute("disabled");
     }
-  })();
+  }
 
-  // Appel API — adapte l’URL si besoin
-  async function sendMark(action, coords){
-    // On cible par défaut une API JSON /attendance/api/mark ; si tu as un autre endpoint, change ici.
-    const url = "/attendance/api/mark";
-    const body = {
-      action,
-      lat:  coords?.lat ?? null,
-      lng:  coords?.lng ?? null,
-      accuracy: coords?.accuracy ?? null,
-      at:   new Date().toISOString()
+  function initButtons() {
+    const ci = $("#btn-checkin");
+    const co = $("#btn-checkout");
+    if (ci) ci.addEventListener("click", () => punch("checkin"));
+    if (co) co.addEventListener("click", () => punch("checkout"));
+  }
+
+  function initGeolocation() {
+    // Si le template fournit des valeurs par data-attr, on les lit en priorité
+    const host = $("#geoLabel");
+    const dl = host?.dataset.defaultLat, dlo = host?.dataset.defaultLon;
+
+    const fallback = () => {
+      coords = {
+        lat: dl ? Number(dl) : DEFAULT_COORDS.lat,
+        lon: dlo ? Number(dlo) : DEFAULT_COORDS.lon
+      };
+      setStatus(`Géolocalisation: ${DEFAULT_COORDS.label}`);
     };
 
-    const r = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      credentials: "include"
-    });
-
-    // On accepte application/json ou text/json
-    const ct = r.headers.get("content-type") || "";
-    const data = ct.includes("json") ? await r.json().catch(()=>({})) : {};
-    if (!r.ok || data.ok === false){
-      const msg = data.message || `Erreur ${r.status}`;
-      throw new Error(msg);
+    if (!("geolocation" in navigator)) {
+      setStatus("Géolocalisation indisponible (utilisation d’un point fixe).");
+      fallback();
+      return;
     }
-    return data;
+
+    // Timeout de sécurité: si rien au bout de 6s -> fallback ESGIS
+    const to = setTimeout(() => {
+      setStatus("Géolocalisation lente, utilisation d’un point fixe.");
+      fallback();
+    }, 6000);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        clearTimeout(to);
+        coords = {
+          lat: pos.coords.latitude,
+          lon: pos.coords.longitude
+        };
+        setStatus(`Géolocalisation OK (${coords.lat.toFixed(5)}, ${coords.lon.toFixed(5)})`);
+      },
+      (_err) => {
+        clearTimeout(to);
+        fallback();
+      },
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 5000 }
+    );
   }
 
-  async function handleAction(action, btn){
-    try {
-      setBusy(btn, true);
-      // Essaye d’obtenir une position (mais ne bloque pas le pointage si KO)
-      const geo = await getLocation();
-      if (geo.ok){
-        geoLbl.textContent = `Géolocalisation : ${geo.lat.toFixed(5)}, ${geo.lng.toFixed(5)} (±${Math.round(geo.accuracy)}m)`;
-      } else {
-        const reasons = {timeout:"temps dépassé", denied:"refusée", unsupported:"non supportée", error:"erreur"};
-        geoLbl.textContent = `Géolocalisation : ${reasons[geo.reason] || "indisponible"}`;
-      }
-
-      const payload = await sendMark(action, geo.ok ? geo : null);
-      const label = action === "checkin" ? "Check-in" : "Check-out";
-      toast(`${label} enregistré ✅`, {ok:true});
-
-      // Si l’API renvoie la durée/heure, tu peux mettre à jour des KPIs locaux ici.
-
-    } catch (e){
-      console.error(e);
-      toast(e.message || "Erreur lors du pointage", {ok:false});
-    } finally {
-      setBusy(btn, false);
-    }
-  }
-
-  btnIn?.addEventListener("click", ()=> handleAction("checkin", btnIn));
-  btnOut?.addEventListener("click", ()=> handleAction("checkout", btnOut));
+  document.addEventListener("DOMContentLoaded", () => {
+    initButtons();
+    initGeolocation();
+  });
 })();

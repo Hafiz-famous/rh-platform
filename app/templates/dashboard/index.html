@@ -2,65 +2,34 @@
 {% block title %}Tableau de bord{% endblock %}
 
 {% block head %}
-  <!-- Chart.js -->
-   <style>
+<style>
   :root{
     --radius:16px;
     --shadow:0 2px 8px rgba(16,24,40,.06), 0 1px 2px rgba(16,24,40,.04);
     --shadow-lg:0 12px 24px rgba(16,24,40,.14), 0 6px 10px rgba(16,24,40,.08);
   }
-
-  /* Cartes “soft” + KPIs : micro-animations, 3D tilt via variables CSS */
   .card.card-soft, .kpi-card{
-    border: none;
-    border-radius: var(--radius);
+    border: none; border-radius: var(--radius);
     box-shadow: var(--shadow);
     transition: transform .28s cubic-bezier(.22,.61,.36,1), box-shadow .28s, background .2s;
     transform: translateZ(0) rotateX(var(--rx,0)) rotateY(var(--ry,0)) translateY(var(--tz,0));
-    will-change: transform, box-shadow;
-    background: #fff;
+    will-change: transform, box-shadow; background: #fff;
   }
-  .card.card-soft:hover, .kpi-card:hover{
-    --tz: -4px;
-    box-shadow: var(--shadow-lg);
-  }
-
-  /* KPI icon animation au survol */
-  .kpi-card .kpi-icon{
-    transition: transform .28s;
-  }
+  .card.card-soft:hover, .kpi-card:hover{ --tz:-4px; box-shadow: var(--shadow-lg); }
+  .kpi-card .kpi-icon{ transition: transform .28s; }
   .kpi-card:hover .kpi-icon{ transform: scale(1.08) rotate(-2deg); }
-
-  /* EOM trophée avec léger bounce au hover */
-  #eom-card .bi-trophy-fill{
-    transition: transform .35s cubic-bezier(.2,.8,.2,1);
-  }
+  #eom-card .bi-trophy-fill{ transition: transform .35s cubic-bezier(.2,.8,.2,1); }
   #eom-card:hover .bi-trophy-fill{ transform: translateY(-2px) rotate(-6deg) scale(1.06); }
-
-  /* Révélation au scroll */
-  [data-reveal]{
-    opacity: 0; transform: translateY(10px);
-    transition: opacity .5s ease, transform .5s ease;
-  }
-  [data-reveal].in-view{ opacity: 1; transform: none; }
-
-  /* Effet ripple (clic) sur .btn et .kpi-card */
-  .ripple-host{ position: relative; overflow: hidden; }
-  .ripple{
-    position:absolute; border-radius:50%; pointer-events:none; inset:auto;
-    transform: scale(0); opacity:.32; background: currentColor;
-    animation: ripple .6s ease-out;
-    mix-blend-mode: multiply;
-  }
+  [data-reveal]{ opacity:0; transform: translateY(10px); transition: opacity .5s ease, transform .5s ease; }
+  [data-reveal].in-view{ opacity:1; transform:none; }
+  .ripple-host{ position:relative; overflow:hidden; }
+  .ripple{ position:absolute; border-radius:50%; pointer-events:none; transform:scale(0); opacity:.32; background: currentColor; animation:ripple .6s ease-out; }
   @keyframes ripple{ to{ transform: scale(12); opacity:0; } }
-
-  /* Accessibilité : désactive les animations si l’utilisateur préfère réduire */
   @media (prefers-reduced-motion: reduce){
-    *{ animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; }
+    *{ animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.001ms!important; }
   }
 </style>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 {% endblock %}
 
 {% block content %}
@@ -71,16 +40,16 @@
   </div>
 
   <div class="d-flex gap-2">
-    <a class="btn btn-primary" href="/attendance/scan">
+    <a class="btn btn-primary" href="{{ url_for('attendance.scanner') }}">
       <i class="bi bi-box-arrow-in-right me-1"></i> Pointer
     </a>
-    <a class="btn btn-outline-primary" href="/qr/attendance?action=checkin">
+    <a class="btn btn-outline-primary" href="{{ url_for('qr.gen_attendance_qr') }}?action=checkin">
       <i class="bi bi-qr-code-scan me-1"></i> QR Check-in
     </a>
-    <a class="btn btn-outline-primary" href="/qr/attendance?action=checkout">
+    <a class="btn btn-outline-primary" href="{{ url_for('qr.gen_attendance_qr') }}?action=checkout">
       <i class="bi bi-qr-code me-1"></i> QR Check-out
     </a>
-    <a class="btn btn-outline-success" href="/exports/report.pdf">
+    <a class="btn btn-outline-success" href="{{ url_for('exports_pdf.report_pdf') }}">
       <i class="bi bi-filetype-pdf me-1"></i> Rapport PDF
     </a>
   </div>
@@ -88,96 +57,160 @@
 
 {# ——— EMPLOYÉ·E DU MOIS ——— #}
 {% set _eom = employee_of_month or {} %}
-{% set _name = eom_name or _eom.name %}
+{# Priorité au gagnant venant de la base, sinon on retombe sur l’ancienne chaîne eom_name #}
+{% set _name = _eom.name or eom_name %}
 {% if _name %}
-<div class="card card-soft mb-3 border-success-subtle" id="eom-card">
+<div class="card card-soft mb-3 border-success-subtle" id="eom-card" data-reveal>
   <div class="card-body d-flex align-items-center gap-3">
     <div class="rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
          style="width:44px;height:44px;">
-      <i class="bi bi-trophy-fill"></i>
+      <i class="bi bi-trophy-fill" aria-hidden="true"></i>
     </div>
     <div class="me-auto">
       <div class="text-muted text-uppercase small fw-semibold">Employé·e du mois</div>
       <div class="h5 mb-0" id="eom-name">{{ _name }}</div>
       <div class="text-muted small" id="eom-meta">
-        {{ _eom.department|default('—') }} · {{ _eom.period_label|default('') }}
+        {{ _eom.department|default('—') }} ·
+        {{ _eom.period_label|default(today.strftime('%B %Y')) }}
       </div>
     </div>
-    <a class="btn btn-sm btn-outline-secondary" href="/users/{{ employee_of_month.user_id }}">Profil</a>
-    </a>
+    {% if _eom.user_id %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ url_for('admin.admin_home') }}#user-{{ _eom.user_id }}">
+        Profil
+      </a>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+<!-- KPIs -->
+<div class="row g-3 mb-3">
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card p-3" data-reveal>
+      <div class="d-flex align-items-center gap-3">
+        <div class="kpi-icon rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center"
+             style="width:44px;height:44px;">
+          <i class="bi bi-people-fill" aria-hidden="true"></i>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-label text-muted small">Présents (aujourd'hui)</div>
+          <div class="kpi-value h4 mb-0" id="kpi-present">—</div>
+          <div class="kpi-sub text-muted small" id="kpi-present-sub">Chargement…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card p-3" data-reveal>
+      <div class="d-flex align-items-center gap-3">
+        <div class="kpi-icon rounded-circle bg-info-subtle text-info d-flex align-items-center justify-content-center"
+             style="width:44px;height:44px;">
+          <i class="bi bi-clock-history" aria-hidden="true"></i>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-label text-muted small">Heures totales (aujourd'hui)</div>
+          <div class="kpi-value h4 mb-0" id="kpi-hours">—</div>
+          <div class="kpi-sub text-muted small" id="kpi-hours-sub">Chargement…</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {# --- Congés en attente avec actions RH/Manager --- #}
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card p-3" data-reveal>
+      <div class="d-flex align-items-center gap-3">
+        <div class="kpi-icon rounded-circle bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
+             style="width:44px;height:44px;">
+          <i class="bi bi-sun" aria-hidden="true"></i>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-label text-muted small">Congés en attente</div>
+          <div class="kpi-value h4 mb-0" id="kpi-leaves-pending">—</div>
+
+          <div class="kpi-sub text-muted small">
+            {% if current_user.is_authenticated and current_user.has_role(Role.ADMIN, Role.MANAGER) %}
+              <a href="{{ url_for('leaves.pending') }}" class="link-underline link-underline-opacity-0">Voir la file</a>
+            {% else %} — {% endif %}
+          </div>
+
+          {% if current_user.is_authenticated and current_user.has_role(Role.ADMIN, Role.MANAGER) %}
+            <div class="mt-2 d-flex gap-2 flex-wrap">
+              <a class="btn btn-sm btn-outline-primary" href="{{ url_for('leaves.pending') }}">
+                <i class="bi bi-sliders me-1"></i> Gérer
+              </a>
+              <a class="btn btn-sm btn-outline-success" href="{{ url_for('exports.export_leaves') }}">
+                <i class="bi bi-download me-1"></i> Export CSV
+              </a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="kpi-card p-3" data-reveal>
+      <div class="d-flex align-items-center gap-3">
+        <div class="kpi-icon rounded-circle bg-danger-subtle text-danger d-flex align-items-center justify-content-center"
+             style="width:44px;height:44px;">
+          <i class="bi bi-lightning-charge" aria-hidden="true"></i>
+        </div>
+        <div class="kpi-body">
+          <div class="kpi-label text-muted small">Heures sup en attente</div>
+          <div class="kpi-value h4 mb-0" id="kpi-ot-pending">—</div>
+          <div class="kpi-sub text-muted small">
+            {% if current_user.is_authenticated and current_user.has_role(Role.ADMIN, Role.MANAGER) %}
+              <a href="{{ url_for('overtime.pending') }}" class="link-underline link-underline-opacity-0">Voir la file</a>
+            {% else %} — {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ——— LISTE DES PRÉSENTS (ADMIN/MANAGER) ——— #}
+{% if current_user.is_authenticated and current_user.has_role(Role.ADMIN, Role.MANAGER) %}
+<div class="row g-3 mb-3">
+  <div class="col-12 col-xl-6">
+    <div class="card card-soft h-100" data-reveal>
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h6 class="mb-0">Présents — aujourd’hui</h6>
+        <span class="text-muted small"><span id="presentCountLabel">0</span></span>
+      </div>
+      <div class="card-body">
+        <div id="presentEmpty" class="text-muted small d-none">Aucun présent pour le moment.</div>
+        <ul id="presentList" class="list-group list-group-flush"></ul>
+      </div>
+    </div>
   </div>
 </div>
 {% endif %}
 
-<!-- KPIs -->
-<div class="row g-3 mb-3">
-  <div class="col-12 col-md-6 col-xl-3">
-    <div class="kpi-card">
-      <div class="kpi-icon bg-primary-subtle text-primary"><i class="bi bi-people-fill"></i></div>
-      <div class="kpi-body">
-        <div class="kpi-label">Présents (aujourd'hui)</div>
-        <div class="kpi-value" id="kpi-present">—</div>
-        <div class="kpi-sub" id="kpi-present-sub">Chargement…</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-md-6 col-xl-3">
-    <div class="kpi-card">
-      <div class="kpi-icon bg-info-subtle text-info"><i class="bi bi-clock-history"></i></div>
-      <div class="kpi-body">
-        <div class="kpi-label">Heures totales (aujourd'hui)</div>
-        <div class="kpi-value" id="kpi-hours">—</div>
-        <div class="kpi-sub" id="kpi-hours-sub">Chargement…</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-md-6 col-xl-3">
-    <div class="kpi-card">
-      <div class="kpi-icon bg-warning-subtle text-warning"><i class="bi bi-sun"></i></div>
-      <div class="kpi-body">
-        <div class="kpi-label">Congés en attente</div>
-        <div class="kpi-value" id="kpi-leaves-pending">—</div>
-        <div class="kpi-sub"><a href="/leaves/pending" class="link-underline link-underline-opacity-0">Voir la file</a></div>
-      </div>
-    </div>
-  </div>
-
-  <div class="col-12 col-md-6 col-xl-3">
-    <div class="kpi-card">
-      <div class="kpi-icon bg-danger-subtle text-danger"><i class="bi bi-lightning-charge"></i></div>
-      <div class="kpi-body">
-        <div class="kpi-label">Heures sup en attente</div>
-        <div class="kpi-value" id="kpi-ot-pending">—</div>
-        <div class="kpi-sub"><a href="/overtime/pending" class="link-underline link-underline-opacity-0">Voir la file</a></div>
-      </div>
-    </div>
-  </div>
-</div>
-
 <!-- Graphiques -->
 <div class="row g-3">
   <div class="col-12 col-xl-6">
-    <div class="card card-soft h-100">
+    <div class="card card-soft h-100" data-reveal>
       <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Présence — 14 jours</h6>
         <span class="text-muted small" id="presenceRangeLabel">Derniers 14 jours</span>
       </div>
       <div class="card-body">
-        <canvas id="presenceChart" height="120"></canvas>
+        <canvas id="presenceChart" height="120" role="img" aria-label="Évolution de la présence"></canvas>
       </div>
     </div>
   </div>
 
   <div class="col-12 col-xl-6">
-    <div class="card card-soft h-100">
+    <div class="card card-soft h-100" data-reveal>
       <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Heures sup approuvées — 14 jours</h6>
         <span class="text-muted small">Derniers 14 jours</span>
       </div>
       <div class="card-body">
-        <canvas id="overtimeChart" height="120"></canvas>
+        <canvas id="overtimeChart" height="120" role="img" aria-label="Heures supplémentaires approuvées"></canvas>
       </div>
     </div>
   </div>
@@ -185,20 +218,57 @@
 
 <div class="row g-3 mt-1">
   <div class="col-12">
-    <div class="card card-soft">
+    <div class="card card-soft" data-reveal>
       <div class="card-header d-flex align-items-center justify-content-between">
         <h6 class="mb-0">Coûts RH par département — mois en cours</h6>
-        <a class="btn btn-sm btn-outline-secondary" href="/exports/department_costs.csv">
+        <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('exports.export_costs') }}">
           <i class="bi bi-download"></i> Export CSV
         </a>
       </div>
       <div class="card-body">
-        <canvas id="deptChart" height="90"></canvas>
+        <canvas id="deptChart" height="90" role="img" aria-label="Coûts par département"></canvas>
       </div>
     </div>
   </div>
 </div>
 
+<!-- Modal gestion des congés -->
+<div class="modal fade" id="modalLeaves" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Congés en attente</h5>
+        <button class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-hover mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Employé</th>
+                <th>Période</th>
+                <th>Jours</th>
+                <th>Type</th>
+                <th>Motif</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leavesBody">
+              <tr id="leavesEmpty"><td colspan="6" class="text-center text-muted py-4">Aucun congé en attente</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('exports.export_leaves', status='PENDING') }}">
+          Exporter CSV
+        </a>
+        <button class="btn btn-secondary" data-bs-dismiss="modal">Fermer</button>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}

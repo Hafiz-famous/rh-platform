@@ -6,6 +6,7 @@ from typing import List
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import Integer, String, DateTime
 from app.extensions import db
+from app.models.user import User
 
 
 class Department(db.Model):

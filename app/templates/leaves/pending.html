@@ -1,33 +1,267 @@
-
 {% extends "base.html" %}
 {% block title %}Validation congés - RH Platform{% endblock %}
+
 {% block content %}
-<h3 class="mb-3">Validation des congés (en attente)</h3>
+<h3 class="mb-3 d-flex align-items-center gap-3">
+  <span>Validation des congés (en attente)</span>
+  <span class="badge bg-secondary">{{ items|length }}</span>
+</h3>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="row g-2 align-items-center">
+      <div class="col-md-6">
+        <label for="filter" class="form-label mb-1">Filtrer</label>
+        <input id="filter" type="search" class="form-control form-control-sm"
+               placeholder="Rechercher par employé, type ou raison…">
+      </div>
+      <div class="col-md-6 text-md-end">
+        <div class="btn-group btn-group-sm" role="group" aria-label="Actions groupées">
+          <button id="bulk-approve" class="btn btn-success" disabled>Approuver la sélection</button>
+          <button id="bulk-reject"  class="btn btn-outline-danger" disabled>Rejeter la sélection</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% set has_items = items and items|length > 0 %}
 <div class="table-responsive">
-  <table class="table table-sm align-middle">
-    <thead><tr><th>#</th><th>Employé</th><th>Type</th><th>Période</th><th>Raison</th><th>Actions</th></tr></thead>
-    <tbody>
-      {% for l in items %}
+  <table class="table table-sm align-middle" id="leaves-table">
+    <caption class="visually-hidden">Table des demandes de congés en attente</caption>
+    <thead>
       <tr>
-        <td>{{ l.id }}</td>
-        <td>{{ l.user.full_name }}</td>
-        <td>{{ l.type.value }}</td>
-        <td>{{ l.start_date }} → {{ l.end_date }}</td>
-        <td>{{ l.reason or '' }}</td>
-        <td>
-          <button class="btn btn-success btn-sm me-1" onclick="setStatus({{l.id}}, 'approved')">Approuver</button>
-          <button class="btn btn-outline-danger btn-sm" onclick="setStatus({{l.id}}, 'rejected')">Rejeter</button>
-        </td>
+        <th style="width:2.5rem">
+          <input class="form-check-input" type="checkbox" id="select-all" aria-label="Tout sélectionner">
+        </th>
+        <th>#</th>
+        <th>Employé</th>
+        <th>Type</th>
+        <th>Période</th>
+        <th>Raison</th>
+        <th class="text-end">Actions</th>
       </tr>
-      {% endfor %}
+    </thead>
+    <tbody>
+      {% if has_items %}
+        {% for l in items %}
+        <tr data-id="{{ l.id }}"
+            data-employee="{{ (l.user.full_name or '') | lower }}"
+            data-type="{{ (l.type.value or '') | lower }}"
+            data-reason="{{ (l.reason or '') | lower }}">
+          <td>
+            <input class="form-check-input row-check" type="checkbox" aria-label="Sélectionner la ligne {{ l.id }}">
+          </td>
+          <td>{{ l.id }}</td>
+          <td>{{ l.user.full_name }}</td>
+          <td>
+            <span class="badge
+              {% set t = (l.type.value or '')|upper %}
+              {% if 'MALAD' in t %} text-bg-warning
+              {% elif 'NON' in t or 'SANS' in t %} text-bg-secondary
+              {% elif 'PAY' in t %} text-bg-success
+              {% else %} text-bg-info
+              {% endif %}
+            ">{{ l.type.value }}</span>
+          </td>
+          <td>
+            {% if l.start_date and l.end_date %}
+              {{ l.start_date.strftime('%d/%m/%Y') if l.start_date.strftime is defined else l.start_date }} → 
+              {{ l.end_date.strftime('%d/%m/%Y') if l.end_date.strftime is defined else l.end_date }}
+            {% else %}
+              —
+            {% endif %}
+          </td>
+          <td class="text-truncate" style="max-width: 22rem;" title="{{ l.reason or '' }}">
+            {{ l.reason or '—' }}
+          </td>
+          <td class="text-end">
+            {# Fallback non-JS : form POST classique #}
+            <form class="d-inline action-form" action="/leaves/{{ l.id }}/status" method="post">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="status" value="approved">
+              <button type="submit" class="btn btn-success btn-sm me-1">Approuver</button>
+            </form>
+
+            <form class="d-inline action-form" action="/leaves/{{ l.id }}/status" method="post" onsubmit="return confirm('Rejeter la demande #{{ l.id }} ?');">
+              {% if csrf_token is defined %}<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% endif %}
+              <input type="hidden" name="status" value="rejected">
+              <button type="submit" class="btn btn-outline-danger btn-sm">Rejeter</button>
+            </form>
+
+            {# Boutons AJAX (progressive enhancement) #}
+            <button type="button" class="btn btn-success btn-sm d-none js-approve" data-id="{{ l.id }}">Approuver</button>
+            <button type="button" class="btn btn-outline-danger btn-sm d-none js-reject"  data-id="{{ l.id }}">Rejeter</button>
+          </td>
+        </tr>
+        {% endfor %}
+      {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted py-5">
+            <div class="mb-2">🎉 Aucune demande en attente.</div>
+            <div>Tout est à jour.</div>
+          </td>
+        </tr>
+      {% endif %}
     </tbody>
   </table>
 </div>
+
+{# Zone de messages (toasts simples) #}
+<div id="alerts" class="mt-3" aria-live="polite" aria-atomic="true"></div>
+
+{# Jeton CSRF récupérable côté JS #}
+{% if csrf_token is defined %}
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+{% endif %}
+
 <script>
-async function setStatus(id, st){
-  const res = await fetch(`/leaves/${id}/status`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({status: st})});
-  const data = await res.json();
-  if(data.ok) location.reload(); else alert('Erreur');
-}
+(function () {
+  // Active les boutons JS et masque les formulaires si fetch est disponible
+  const supportsFetch = typeof fetch === 'function';
+  document.querySelectorAll('.action-form').forEach(f => {
+    if (supportsFetch) f.classList.add('d-none');
+  });
+  if (supportsFetch) {
+    document.querySelectorAll('.js-approve,.js-reject').forEach(b => b.classList.remove('d-none'));
+  }
+
+  const table = document.getElementById('leaves-table');
+  const selectAll = document.getElementById('select-all');
+  const bulkApprove = document.getElementById('bulk-approve');
+  const bulkReject  = document.getElementById('bulk-reject');
+  const filterInput = document.getElementById('filter');
+  const alerts = document.getElementById('alerts');
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || null;
+
+  function toast(msg, type='success') {
+    const el = document.createElement('div');
+    el.className = `alert alert-${type} alert-dismissible fade show`;
+    el.role = 'alert';
+    el.innerHTML = `
+      <div>${msg}</div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+    `;
+    alerts.appendChild(el);
+    setTimeout(()=> {
+      try { new bootstrap.Alert(el).close(); } catch(e){}
+    }, 4000);
+  }
+
+  async function setStatus(id, st){
+    try {
+      const btns = table.querySelectorAll(`tr[data-id="${id}"] button`);
+      btns.forEach(b => b.disabled = true);
+      const res = await fetch(`/leaves/${id}/status`, {
+        method:'POST',
+        headers:{
+          'Content-Type':'application/json',
+          ...(csrf ? {'X-CSRFToken': csrf} : {})
+        },
+        body: JSON.stringify({status: st})
+      });
+      const data = await res.json().catch(()=>({ok:false}));
+      if (res.ok && data.ok) {
+        // Retire la ligne approuvée/rejetée
+        table.querySelector(`tr[data-id="${id}"]`)?.remove();
+        toast(`Demande #${id} ${st === 'approved' ? 'approuvée' : 'rejetée'} avec succès.`, 'success');
+      } else {
+        throw new Error(data?.error || 'Erreur serveur');
+      }
+    } catch (e) {
+      toast(`Échec de l’opération (#${id}) : ${e.message}`, 'danger');
+      // réactive les boutons
+      table.querySelectorAll(`tr[data-id="${id}"] button`).forEach(b => b.disabled = false);
+    }
+    toggleBulkButtons();
+    updateCounter();
+    showEmptyStateIfNeeded();
+  }
+
+  async function setStatusMany(ids, st){
+    if (!ids.length) return;
+    if (!confirm(`${st === 'approved' ? 'Approuver' : 'Rejeter'} ${ids.length} demande(s) sélectionnée(s) ?`)) return;
+    // Envoie en série pour simplicité/retour clair (peut être parallélisé au besoin)
+    for (const id of ids) { /* eslint-disable no-await-in-loop */
+      await setStatus(id, st);
+    }
+  }
+
+  // Délégation d’événements pour les boutons ligne
+  table.addEventListener('click', (e) => {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+    if (btn.classList.contains('js-approve')) {
+      setStatus(btn.dataset.id, 'approved');
+    } else if (btn.classList.contains('js-reject')) {
+      if (confirm(`Rejeter la demande #${btn.dataset.id} ?`)) {
+        setStatus(btn.dataset.id, 'rejected');
+      }
+    }
+  });
+
+  // Sélection et actions groupées
+  function selectedIds(){
+    return Array.from(document.querySelectorAll('.row-check:checked'))
+      .map(cb => cb.closest('tr')?.dataset.id)
+      .filter(Boolean);
+  }
+  function toggleBulkButtons(){
+    const any = selectedIds().length > 0;
+    bulkApprove.disabled = !any;
+    bulkReject.disabled  = !any;
+  }
+  selectAll?.addEventListener('change', () => {
+    document.querySelectorAll('.row-check').forEach(cb => { cb.checked = selectAll.checked; });
+    toggleBulkButtons();
+  });
+  table.addEventListener('change', (e) => {
+    if (e.target.classList.contains('row-check')) {
+      toggleBulkButtons();
+    }
+  });
+  bulkApprove.addEventListener('click', () => setStatusMany(selectedIds(), 'approved'));
+  bulkReject.addEventListener('click',  () => setStatusMany(selectedIds(), 'rejected'));
+
+  // Filtre simple (employé / type / raison)
+  function applyFilter(){
+    const q = (filterInput.value || '').trim().toLowerCase();
+    const rows = table.querySelectorAll('tbody tr');
+    rows.forEach(tr => {
+      if (!tr.dataset.id) return; // ignore la ligne "état vide"
+      const hay = `${tr.dataset.employee} ${tr.dataset.type} ${tr.dataset.reason}`;
+      tr.style.display = hay.includes(q) ? '' : 'none';
+    });
+  }
+  filterInput.addEventListener('input', applyFilter);
+
+  function updateCounter(){
+    const count = table.querySelectorAll('tbody tr[data-id]').length;
+    const badge = document.querySelector('h3 .badge');
+    if (badge) badge.textContent = count;
+  }
+  function showEmptyStateIfNeeded(){
+    const visibleDataRows = Array.from(table.querySelectorAll('tbody tr[data-id]'))
+      .filter(tr => tr.style.display !== 'none');
+    let emptyRow = table.querySelector('tbody tr[data-empty]');
+    if (visibleDataRows.length === 0) {
+      if (!emptyRow) {
+        emptyRow = document.createElement('tr');
+        emptyRow.setAttribute('data-empty','1');
+        emptyRow.innerHTML = `<td colspan="7" class="text-center text-muted py-5">
+          <div class="mb-2">🎉 Aucune demande en attente.</div>
+          <div>Tout est à jour.</div>
+        </td>`;
+        table.querySelector('tbody').appendChild(emptyRow);
+      }
+    } else if (emptyRow) {
+      emptyRow.remove();
+    }
+  }
+
+  // Init
+  toggleBulkButtons();
+  updateCounter();
+})();
 </script>
 {% endblock %}

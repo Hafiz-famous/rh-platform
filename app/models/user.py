@@ -46,19 +46,19 @@ class User(UserMixin, db.Model):
     )
 
     # Relations (assure-toi que les autres modèles utilisent back_populates symétriquement)
-    department: Mapped[Optional["Department"]] = relationship(
+    department: Mapped[Optional["Department"]] = relationship( # type: ignore
         "Department", back_populates="users"
     )
 
-    attendances: Mapped[List["Attendance"]] = relationship(
+    attendances: Mapped[List["Attendance"]] = relationship( # type: ignore
         "Attendance", back_populates="user", cascade="all, delete-orphan"
     )
 
-    leaves: Mapped[List["Leave"]] = relationship(
+    leaves: Mapped[List["Leave"]] = relationship( # type: ignore
         "Leave", back_populates="user", cascade="all, delete-orphan"
     )
 
-    overtimes: Mapped[List["Overtime"]] = relationship(
+    overtimes: Mapped[List["Overtime"]] = relationship( # type: ignore
         "Overtime", back_populates="user", cascade="all, delete-orphan"
     )
 

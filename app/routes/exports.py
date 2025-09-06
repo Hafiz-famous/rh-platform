@@ -3,7 +3,7 @@ import csv, io, json
 from datetime import date, datetime, time
 from typing import Iterable, Any, Optional
 
-from flask import Blueprint, Response, request, render_template
+from flask import Blueprint, Response, request, render_template, stream_with_context, current_app
 from flask_login import login_required
 from sqlalchemy import literal
 
@@ -31,16 +31,13 @@ def _serialize_cell(v: Any) -> str:
     """CSV-safe: Enum -> value, date/datetime/time -> isoformat, dict/list -> json, None -> ''."""
     if v is None:
         return ""
-    # Enum (SQLAlchemy ou Python)
-    if hasattr(v, "value"):
+    if hasattr(v, "value"):  # enum
         try:
             return str(v.value)
         except Exception:
             pass
-    # Dates & heures
     if isinstance(v, (datetime, date, time)):
         return v.isoformat()
-    # Objets complexes -> JSON
     if isinstance(v, (dict, list)):
         return json.dumps(v, ensure_ascii=False)
     return str(v)
@@ -53,7 +50,10 @@ def _get_sep() -> str:
 
 
 def stream_csv(rows_iterable: Iterable, headers: list[str], filename: str) -> Response:
-    """Génère un CSV streamé (UTF-8 + BOM) avec séparateur configurable."""
+    """
+    Génère un CSV streamé (UTF-8 + BOM) avec séparateur configurable.
+    ⚠️ Enveloppe le générateur dans `stream_with_context` pour garder le contexte Flask.
+    """
     delimiter = _get_sep()
 
     def generate():
@@ -70,19 +70,17 @@ def stream_csv(rows_iterable: Iterable, headers: list[str], filename: str) -> Re
         # Lignes
         for row in rows_iterable:
             try:
-                # Row SQLA 2.x est séquence-like
-                values = list(row)
+                values = list(row)  # SQLA Row (séquence-like)
             except TypeError:
-                # Fallback mapping
-                values = list(row._mapping.values()) if hasattr(row, "_mapping") else list(row)
+                values = list(getattr(row, "_mapping", {}).values()) if hasattr(row, "_mapping") else list(row)
             writer.writerow([_serialize_cell(v) for v in values])
             yield output.getvalue()
             output.seek(0); output.truncate(0)
 
     return Response(
-        generate(),
+        stream_with_context(generate()),  # ✅ garde le contexte app pendant le streaming
         mimetype="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f"attachment; filename={filename}"}
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
     )
 
 
@@ -112,7 +110,6 @@ def export_attendance():
     d_to   = _parse_date(request.args.get("to")   or request.args.get("date_to"))
     email  = (request.args.get("email") or "").strip()
 
-    # Colonnes potentiellement absentes suivant le schéma
     source_col = getattr(Attendance, "source", literal(None).label("source"))
 
     if hasattr(Attendance, "geo_lat") and hasattr(Attendance, "geo_lon"):
@@ -140,7 +137,8 @@ def export_attendance():
             lon_col,
         )
         .join(User, User.id == Attendance.user_id)
-    )
+        .order_by(Attendance.work_date.desc(), Attendance.id.desc())
+    ).execution_options(yield_per=1000)  # ✅ streaming efficace
 
     if d_from:
         q = q.filter(Attendance.work_date >= d_from)
@@ -148,8 +146,6 @@ def export_attendance():
         q = q.filter(Attendance.work_date <= d_to)
     if email:
         q = q.filter(User.email == email)
-
-    q = q.order_by(Attendance.work_date.desc(), Attendance.id.desc())
 
     headers = ["id","email","date","check_in","check_out","total_hours","source",lat_label,lon_label]
     return stream_csv(q, headers, "attendance.csv")
@@ -177,11 +173,12 @@ def export_overtime():
             User.email,
             Overtime.work_date,
             Overtime.hours,
-            Overtime.status,   # Enum -> value via _serialize_cell
+            Overtime.status,
             Overtime.note,
         )
         .join(User, User.id == Overtime.user_id)
-    )
+        .order_by(Overtime.work_date.desc(), Overtime.id.desc())
+    ).execution_options(yield_per=1000)
 
     if d_from:
         q = q.filter(Overtime.work_date >= d_from)
@@ -195,8 +192,6 @@ def export_overtime():
             pass
     if email:
         q = q.filter(User.email == email)
-
-    q = q.order_by(Overtime.work_date.desc(), Overtime.id.desc())
 
     headers = ["id","email","date","hours","status","note"]
     return stream_csv(q, headers, "overtime.csv")
@@ -224,12 +219,13 @@ def export_leaves():
             User.email,
             Leave.start_date,
             Leave.end_date,
-            Leave.type,     # Enum -> value via _serialize_cell
-            Leave.status,   # Enum -> value via _serialize_cell
+            Leave.type,
+            Leave.status,
             Leave.reason,
         )
         .join(User, User.id == Leave.user_id)
-    )
+        .order_by(Leave.start_date.desc(), Leave.id.desc())
+    ).execution_options(yield_per=1000)
 
     if d_from:
         q = q.filter(Leave.start_date >= d_from)
@@ -243,8 +239,6 @@ def export_leaves():
             pass
     if email:
         q = q.filter(User.email == email)
-
-    q = q.order_by(Leave.start_date.desc(), Leave.id.desc())
 
     headers = ["id","email","start_date","end_date","type","status","reason"]
     return stream_csv(q, headers, "leaves.csv")
@@ -260,7 +254,8 @@ def export_costs():
       - month=YYYY-MM (défaut: mois courant)
     """
     ym = request.args.get("month") or date.today().strftime("%Y-%m")
-    data = department_costs(ym)  # [{department, cost}]
-    rows = ((r.get("department", ""), r.get("cost", 0)) for r in (data or []))
-    headers = ["department","cost"]
+    data = department_costs(ym) or []  # [{department, cost}]
+    rows = ((r.get("department", ""), r.get("cost", 0)) for r in data)
+
+    headers = ["department", "cost"]
     return stream_csv(rows, headers, f"department_costs_{ym}.csv")

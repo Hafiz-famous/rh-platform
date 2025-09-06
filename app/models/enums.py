@@ -24,3 +24,8 @@ class RequestStatus(enum.Enum):
     PENDING = "PENDING"
     APPROVED = "APPROVED"
     REJECTED = "REJECTED"
+
+
+class OvertimeSource(enum.Enum):
+    AUTO = "AUTO"
+    MANUAL = "MANUAL"

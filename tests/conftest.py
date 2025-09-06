@@ -1,5 +1,5 @@
 
-import os, pytest
+import os, pytest # pyright: ignore[reportMissingImports]
 from app import create_app
 from app.extensions import db
 

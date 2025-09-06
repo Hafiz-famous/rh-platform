@@ -38,4 +38,4 @@ class Attendance(db.Model):
     source: Mapped[Optional[str]] = mapped_column(String(20), nullable=True)  # 'qr' | 'manual'
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
-    user: Mapped["User"] = relationship("User", back_populates="attendances")
+    user: Mapped["User"] = relationship("User", back_populates="attendances") # type: ignore

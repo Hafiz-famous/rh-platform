@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from datetime import date
 from flask import Flask
 from .extensions import db, migrate, login_manager, mail
 from .utils import fmt_hours
@@ -9,6 +10,7 @@ from .utils import fmt_hours
 # --- formatage FR (Babel si dispo, sinon strftime) ---
 try:
     from babel.dates import format_date as _format_date  # pip install Babel
+
     def fr_month_label(d):  # ex: "août 2025"
         return _format_date(d, format="LLLL yyyy", locale="fr_FR")
 except Exception:
@@ -106,6 +108,9 @@ def create_app() -> Flask:
         AUTO_OVERTIME=bool(auto),
     )
 
+    # Rendre la config dispo dans Jinja (utile pour AUTO_OVERTIME, etc.)
+    app.jinja_env.globals.update(config=app.config)
+
     # ---------- Extensions ----------
     db.init_app(app)
     # importer les modèles pour que Migrate les voie
@@ -171,29 +176,47 @@ def create_app() -> Flask:
 
     # ---------- Jinja context (Role + Employé·e du mois + AUTO_OVERTIME) ----------
     from .models.enums import Role
-    from sqlalchemy import func
-    from .models.employee_of_month import EmployeeOfMonth
+    from .models.award import Award  # <-- utilise la table awards comme source unique
 
     @app.context_processor
     def inject_enums_and_config():
         eom_obj = None
         eom_name = None
         try:
-            period = db.session.query(func.max(EmployeeOfMonth.period)).scalar()
-            if period:
-                e = db.session.query(EmployeeOfMonth).filter_by(period=period).first()
-                if e and getattr(e, "user", None):
-                    eom_name = (f"{e.user.first_name} {e.user.last_name}".strip() or e.user.email)
-                    dept = getattr(getattr(e.user, "department", None), "name", None)
-                    eom_obj = {
-                        "name": eom_name,
-                        "department": dept,
-                        "period_label": fr_month_label(period),
-                        "period": str(period),
-                        "note": e.note or "",
-                        "user_id": e.user_id,
-                    }
-        except Exception:
+            ym_today = date.today().strftime("%Y-%m")
+            # 1) Mois courant, sinon dernier enregistrement
+            award = (
+                db.session.query(Award)
+                .filter(Award.month == ym_today)
+                .first()
+            ) or (
+                db.session.query(Award)
+                .order_by(Award.month.desc())
+                .first()
+            )
+
+            if award and getattr(award, "user", None):
+                u = award.user
+                name = (f"{(u.first_name or '').strip()} {(u.last_name or '').strip()}".strip()) or u.email
+                dept = getattr(getattr(u, "department", None), "name", None)
+                # Libellé période
+                try:
+                    y, m = map(int, (award.month or "").split("-"))
+                    per_label = fr_month_label(date(y, m, 1))
+                except Exception:
+                    per_label = award.month or "—"
+
+                eom_name = name
+                eom_obj = {
+                    "name": name,
+                    "department": dept,
+                    "period_label": per_label,
+                    "period": award.month,
+                    "note": "",           # Award n'a pas de note → champ laissé vide
+                    "user_id": u.id,
+                }
+        except Exception as e:
+            app.logger.debug("Context EOM non injecté: %s", e)
             eom_obj = None
             eom_name = None
 
@@ -208,7 +231,7 @@ def create_app() -> Flask:
     # ---------- Scheduler (optionnel) ----------
     try:
         if app.config.get("SCHEDULER_ENABLED", False):
-            from flask_apscheduler import APScheduler  # type: ignore
+            from flask_pscheduler import APScheduler  # type: ignore
             scheduler = APScheduler()
             scheduler.init_app(app)
             try:

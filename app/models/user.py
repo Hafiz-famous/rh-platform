@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_login import UserMixin
 
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, Boolean, Float, DateTime, ForeignKey
-from sqlalchemy import Enum as SAEnum  # évite la confusion avec enum.Enum
+from sqlalchemy import (
+    Integer, String, Boolean, Float, DateTime, ForeignKey, CheckConstraint, Index
+)
+from sqlalchemy import Enum as SAEnum
+from sqlalchemy.orm import Mapped, mapped_column, relationship, validates
 
 from app.extensions import db
 from .enums import Role  # Enum Python: class Role(Enum): ADMIN=..., MANAGER=..., HR=..., EMPLOYEE=...
@@ -32,34 +34,35 @@ class User(UserMixin, db.Model):
     first_name: Mapped[str] = mapped_column(String(80), nullable=False)
     last_name: Mapped[str] = mapped_column(String(80), nullable=False)
 
-    # Enum SQLAlchemy basé sur l'Enum Python `Role`
     role: Mapped[Role] = mapped_column(
-        SAEnum(Role, name="role_enum"), nullable=False, default=Role.EMPLOYEE
+        SAEnum(Role, name="role_enum"), nullable=False, default=Role.EMPLOYEE, index=True
     )
 
-    hourly_rate: Mapped[float] = mapped_column(Float, default=8.0, nullable=False)
+    hourly_rate: Mapped[float] = mapped_column(Float, nullable=False, default=8.0)
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # ⚠️ Garde ce nom si tu l'utilises déjà partout. Flask-Login lira bien un bool ici.
+    is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime, default=datetime.utcnow, nullable=False
-    )
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
-    # Relations (assure-toi que les autres modèles utilisent back_populates symétriquement)
-    department: Mapped[Optional["Department"]] = relationship( # type: ignore
+    # --- Relations ---
+    department: Mapped[Optional["Department"]] = relationship(
         "Department", back_populates="users"
     )
-
-    attendances: Mapped[List["Attendance"]] = relationship( # type: ignore
+    attendances: Mapped[list["Attendance"]] = relationship(
         "Attendance", back_populates="user", cascade="all, delete-orphan"
     )
-
-    leaves: Mapped[List["Leave"]] = relationship( # type: ignore
+    leaves: Mapped[list["Leave"]] = relationship(
         "Leave", back_populates="user", cascade="all, delete-orphan"
     )
-
-    overtimes: Mapped[List["Overtime"]] = relationship( # type: ignore
+    overtimes: Mapped[list["Overtime"]] = relationship(
         "Overtime", back_populates="user", cascade="all, delete-orphan"
+    )
+
+    __table_args__ = (
+        CheckConstraint("hourly_rate >= 0", name="ck_users_hourly_rate_nonneg"),
+        # index composite utile si tu filtres souvent par dept + rôle
+        Index("ix_users_department_role", "department_id", "role"),
     )
 
     # ---------- Helpers sécurité / rôles ----------
@@ -71,19 +74,20 @@ class User(UserMixin, db.Model):
 
     @property
     def full_name(self) -> str:
-        return f"{self.first_name} {self.last_name}"
+        fn = (self.first_name or "").strip()
+        ln = (self.last_name or "").strip()
+        return (f"{fn} {ln}".strip()) or self.email
 
-    # Raccourcis de rôles (utilisables dans Jinja : current_user.is_admin(), etc.)
     def has_role(self, *roles: Role) -> bool:
         """True si l'utilisateur possède un des rôles spécifiés."""
         return self.role in roles
 
+    # Rôles de base
     def is_admin(self) -> bool:
         return self.role == Role.ADMIN
 
     def is_manager(self) -> bool:
-        # souvent on considère qu'un admin a aussi les droits manager
-        return self.role in (Role.MANAGER, Role.ADMIN)
+        return self.role == Role.MANAGER or self.is_admin()
 
     def is_hr(self) -> bool:
         return self.role == Role.HR
@@ -91,14 +95,35 @@ class User(UserMixin, db.Model):
     def is_employee(self) -> bool:
         return self.role == Role.EMPLOYEE
 
+    # ➕ Droits fins (pour tes vues / blueprints)
     def can_access_admin(self) -> bool:
-        """Droit d'afficher le menu /admin (admin ou manager)."""
-        return self.is_admin() or self.is_manager()
+        """Droit d'afficher le menu /admin (admin, manager ou HR)."""
+        return self.is_admin() or self.is_manager() or self.is_hr()
+
+    def can_manage_users(self) -> bool:
+        """Créer/modifier des comptes utilisateurs → admin ou RH UNIQUEMENT."""
+        return self.is_admin() or self.is_hr()
+
+    def can_manage_attendance(self) -> bool:
+        """Gérer les pointages → manager, RH ou admin."""
+        return self.is_admin() or self.is_hr() or self.is_manager()
+
+    def can_manage_payroll(self) -> bool:
+        """Gérer paie/coûts → RH ou admin."""
+        return self.is_admin() or self.is_hr()
 
     @property
     def display_role(self) -> str:
         # joli libellé pour l'UI
-        return self.role.name.title() if hasattr(self.role, "name") else str(self.role)
+        try:
+            return self.role.name.title()
+        except AttributeError:
+            return str(self.role)
 
-    def __repr__(self) -> str:
+    @validates("email")
+    def _normalize_email(self, key: str, value: str) -> str:
+        """Normalise l'email (trim + lowercase) pour garantir l'unicité logique."""
+        return (value or "").strip().lower()
+
+    def __repr__(self) -> str:  # pragma: no cover
         return f"<User id={self.id} email={self.email} role={self.role}>"

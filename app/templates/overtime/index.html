@@ -2,9 +2,9 @@
 {% block title %}Mes heures sup - Plateforme RH{% endblock %}
 
 {% block content %}
-<h3 class="mb-3 d-flex items-center gap-3">
+<h3 class="mb-3 d-flex align-items-center gap-3">
   <span>Mes heures supplémentaires</span>
-  <span class="badge bg-secondary">{{ items|length if items is defined else 0 }}</span>
+  <span class="badge bg-secondary">{{ items|length if items else 0 }}</span>
 </h3>
 
 {# --- Bandeau "mode automatique" --- #}
@@ -54,6 +54,17 @@
   </div>
 </div>
 
+<div class="row g-3 align-items-end mb-3">
+  <div class="col-md-4">
+    <label for="q" class="form-label mb-1">Rechercher</label>
+    <input id="q" type="search" class="form-control form-control-sm" placeholder="Note / Note calcul…">
+  </div>
+  <div class="col-md-8 d-flex justify-content-end gap-2">
+    <button id="reset-filters" class="btn btn-outline-secondary btn-sm">Réinitialiser les filtres</button>
+    <button id="export-csv" class="btn btn-outline-primary btn-sm">Exporter CSV (visible)</button>
+  </div>
+</div>
+
 <div class="row g-3 mb-3" id="summary">
   <div class="col-md-4">
     <div class="card h-100"><div class="card-body py-3">
@@ -87,8 +98,7 @@
 <div class="d-flex justify-content-between align-items-center mb-2">
   <div class="text-muted small" id="visible-count"></div>
   <div class="d-flex gap-2">
-    <button id="reset-filters" class="btn btn-outline-secondary btn-sm">Réinitialiser les filtres</button>
-    <button id="export-csv" class="btn btn-outline-primary btn-sm">Exporter CSV (visible)</button>
+    <button id="reset-filters-dup" class="btn btn-outline-secondary btn-sm d-none">Réinitialiser</button>
   </div>
 </div>
 
@@ -114,15 +124,21 @@
         {% if items and items|length > 0 %}
           {% for o in items %}
           {% set s = (o.status.value if o.status else '') %}
-          {% set src = (o.source.value if (o.source is defined and o.source) else '') %}
+          {# origin: préférer o.origin; fallback o.source.value #}
+          {% set src = (o.origin if (o.origin is defined and o.origin) else (o.source.value if (o.source is defined and o.source) else '')) %}
           {% set astate = (o.auto_state.value if (o.auto_state is defined and o.auto_state) else '') %}
+          {# note calc: préférer note_calc; fallback calc_note #}
+          {% set note_calc = (o.note_calc if o.note_calc is defined else (o.calc_note if o.calc_note is defined else '')) %}
+          {# timestamp calc: préférer calc_at; fallback last_computed_at #}
+          {% set ts_calc = (o.calc_at if o.calc_at is defined else (o.last_computed_at if o.last_computed_at is defined else None)) %}
+
           <tr data-id="{{ o.id }}"
               data-date="{{ o.work_date.strftime('%Y-%m-%d') if (o.work_date and o.work_date.strftime is defined) else o.work_date }}"
               data-hours="{{ o.hours or 0 }}"
               data-status="{{ s }}"
               data-origin="{{ src }}"
               data-note="{{ (o.note or '')|lower }}"
-              data-calcnote="{{ (o.calc_note if o.calc_note is defined else '')|lower }}">
+              data-calcnote="{{ (note_calc or '')|lower }}">
             <td>{{ o.id }}</td>
             <td>{{ o.work_date.strftime('%d/%m/%Y') if (o.work_date and o.work_date.strftime is defined) else (o.work_date or '—') }}</td>
             <td class="text-end">{{ '%.2f'|format(o.hours or 0) }}</td>
@@ -144,12 +160,12 @@
               {% else %}—{% endif %}
             </td>
             <td class="text-truncate" style="max-width:18rem" title="{{ o.note or '' }}">{{ o.note or '—' }}</td>
-            <td class="text-truncate" style="max-width:18rem" title="{{ o.calc_note if o.calc_note is defined else '' }}">
-              {{ (o.calc_note if o.calc_note is defined else '—') or '—' }}
+            <td class="text-truncate" style="max-width:18rem" title="{{ note_calc or '' }}">
+              {{ note_calc or '—' }}
             </td>
             <td>
-              {% if o.last_computed_at is defined and o.last_computed_at %}
-                {{ o.last_computed_at.strftime('%d/%m/%Y %H:%M') if o.last_computed_at.strftime is defined else o.last_computed_at }}
+              {% if ts_calc %}
+                {{ ts_calc.strftime('%d/%m/%Y %H:%M') if ts_calc.strftime is defined else ts_calc }}
               {% else %}—{% endif %}
             </td>
           </tr>
@@ -187,20 +203,9 @@
 
   const rows = () => $$('#ot-table tbody tr[data-id]');
   const from  = $('#from'), to = $('#to'), status = $('#status'), origin = $('#origin');
-  const q = document.createElement('input'); // pour recherche combinée
+  const q = $('#q');
   const reset = $('#reset-filters');
   const visibleCount = $('#visible-count');
-
-  // Ajoute un champ de recherche… (si tu veux garder “Recherché” remets-le dans le HTML)
-  // Ici, on filtre par note et note calcul
-  const searchCol = document.createElement('div');
-  searchCol.className = 'col-12 col-md-4 mb-3';
-  searchCol.innerHTML = `
-    <label class="form-label mb-1">Rechercher</label>
-    <input id="q" type="search" class="form-control form-control-sm" placeholder="Note / note calcul…">
-  `;
-  document.querySelector('#summary').before(searchCol);
-  q.replaceWith($('#q'));
 
   const sumEls = {
     PENDING:  { h: $('#sum-pending-hours'),  c: $('#sum-pending-count') },
@@ -215,7 +220,7 @@
     const t = to?.value || '';
     const st = (status?.value || '').toUpperCase();
     const org = (origin?.value || '').toLowerCase();
-    const query = ($('#q')?.value || '').trim().toLowerCase();
+    const query = (q?.value || '').trim().toLowerCase();
 
     const acc = { PENDING:{h:0,c:0}, APPROVED:{h:0,c:0}, REJECTED:{h:0,c:0} };
     let visible = 0;
@@ -262,8 +267,13 @@
   }
 
   [from, to, status, origin].forEach(el => el?.addEventListener('input', applyFilters));
-  document.addEventListener('input', e => { if (e.target.id === 'q') applyFilters(); });
-  reset?.addEventListener('click', () => { if(from)from.value=''; if(to)to.value=''; if(status)status.value=''; if(origin)origin.value=''; const qel=$('#q'); if(qel) qel.value=''; applyFilters(); });
+  q?.addEventListener('input', applyFilters);
+  $('#reset-filters')?.addEventListener('click', () => {
+    if(from)from.value=''; if(to)to.value='';
+    if(status)status.value=''; if(origin)origin.value='';
+    if(q) q.value='';
+    applyFilters();
+  });
 
   // Export CSV (visible)
   $('#export-csv')?.addEventListener('click', () => {
@@ -271,7 +281,8 @@
     const headers = ['ID','Date','Heures','Statut','État auto','Origine','Note','Note calcul','Calculé le'];
     const lines = [headers.join(sep)];
 
-    rows().filter(tr => tr.style.display !== 'none').forEach(tr => {
+    $$('#ot-table tbody tr').forEach(tr => {
+      if (tr.style.display === 'none' || tr.hasAttribute('data-empty')) return;
       const tds = tr.querySelectorAll('td');
       const row = [
         tds[0]?.innerText.trim() || '',
@@ -288,41 +299,65 @@
       lines.push(csvRow);
     });
 
-    const blob = new Blob([lines.join('\n')], {type: 'text/csv;charset=utf-8;'});
+    const blob = new Blob(["\ufeff" + lines.join('\n')], {type: 'text/csv;charset=utf-8;'}); // BOM pour Excel
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = 'mes_heures_sup_auto.csv';
+    const today = new Date().toISOString().slice(0,10);
+    a.download = `mes_heures_sup_${today}.csv`;
     document.body.appendChild(a); a.click(); a.remove();
   });
 
-  // Recalcul
-  async function callRecompute(fromISO, toISO, btn){
+  // Helpers date locale -> ISO (YYYY-MM-DD) sans TZ drift
+  const todayISO = () => {
+    const now = new Date();
+    return new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  };
+  const isoNDaysAgo = (n) => {
+    const now = new Date();
+    now.setDate(now.getDate() - n);
+    return new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+  };
+
+  // Appel du recalcul (POST JSON -> /overtime/recalc)
+  async function callRecalc(fromISO, toISO, btn){
     try{
       btn?.setAttribute('disabled','true');
       btn?.querySelector('.spinner-border')?.classList.remove('d-none');
-      const url = `/overtime/recompute?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`;
-      const res = await fetch(url, { method:'POST', headers: { ...(csrf ? {'X-CSRFToken': csrf} : {}) } });
+
+      const res = await fetch('/overtime/recalc', {
+        method:'POST',
+        headers: {
+          'Content-Type':'application/json',
+          ...(csrf ? {'X-CSRFToken': csrf} : {})
+        },
+        body: JSON.stringify({ from: fromISO, to: toISO })
+      });
       const data = await res.json().catch(()=>({ok:false}));
-      if (res.ok && data.ok) location.reload();
-      else throw new Error(data?.error || 'Échec du recalcul');
-    } catch(e){ toast(e.message || 'Erreur lors du recalcul', 'danger', 5000); }
-    finally{
+
+      if (res.ok && data.ok) {
+        toast(`Recalcul effectué (${data._from} → ${data._to}).`, 'success');
+        // Recharge pour voir les nouvelles lignes
+        setTimeout(()=>location.reload(), 600);
+      } else {
+        throw new Error(data?.error || 'Échec du recalcul');
+      }
+    } catch(e){
+      toast(e.message || 'Erreur lors du recalcul', 'danger', 6000);
+    } finally{
       btn?.removeAttribute('disabled');
       btn?.querySelector('.spinner-border')?.classList.add('d-none');
     }
   }
 
   $('#recalc-today')?.addEventListener('click', (ev)=>{
-    const now = new Date();
-    const iso = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    callRecompute(iso, iso, ev.currentTarget);
+    const iso = todayISO();
+    callRecalc(iso, iso, ev.currentTarget);
   });
+
   $('#recalc-7d')?.addEventListener('click', (ev)=>{
-    const now = new Date();
-    const to = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    const d0 = new Date(now); d0.setDate(now.getDate() - 6);
-    const from = new Date(d0.getTime() - d0.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    callRecompute(from, to, ev.currentTarget);
+    const to = todayISO();
+    const from = isoNDaysAgo(6);
+    callRecalc(from, to, ev.currentTarget);
   });
 
   // init

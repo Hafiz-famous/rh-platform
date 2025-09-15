@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Employé{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex flex-wrap gap-2 mb-4">
+    <!-- Liens génériques pour éviter les erreurs d'endpoint.
+         Remplace /attendance, /leaves, /overtime par tes url_for si besoin. -->
+    <a class="btn btn-primary" href="/attendance">Pointer</a>
+    <a class="btn btn-outline-primary" href="/attendance/qr-checkin">QR Check-in</a>
+    <a class="btn btn-outline-primary" href="/attendance/qr-checkout">QR Check-out</a>
+    <a class="btn btn-outline-secondary" href="/reports/mine">Mon rapport PDF</a>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-6">
+      <div class="card p-3 rounded-3 shadow-sm">
+        <div class="fw-semibold">Présents (aujourd’hui)</div>
+        <div class="fs-2">{{ stats.today or 0 }}</div>
+        <div class="text-muted small">Tous services confondus</div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card p-3 rounded-3 shadow-sm">
+        <div class="fw-semibold">Bienvenue</div>
+        <div class="text-muted">Accédez rapidement au pointage, aux congés et aux heures sup.</div>
+      </div>
+    </div>
+  </div>
+
+  {% if employee_of_month %}
+  <div class="card p-3 rounded-3 shadow-sm d-flex flex-row align-items-center gap-3">
+    <div class="fs-3">🏅</div>
+    <div>
+      <div class="text-uppercase small text-muted">Employé·e du mois — {{ employee_of_month.period_label }}</div>
+      <div class="fw-bold">{{ employee_of_month.name }}</div>
+      <div class="text-muted">{{ employee_of_month.department }}</div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

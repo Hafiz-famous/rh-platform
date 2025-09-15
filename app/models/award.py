@@ -1,16 +1,21 @@
-
-from datetime import datetime
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import Integer, String, DateTime, Float, ForeignKey, JSON, UniqueConstraint
+# app/models/award.py
+from __future__ import annotations
 from ..extensions import db
 
 class Award(db.Model):
     __tablename__ = "awards"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    month: Mapped[str] = mapped_column(String(7), index=True)  # 'YYYY-MM'
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    score: Mapped[float] = mapped_column(Float, nullable=False)
-    details: Mapped[dict] = mapped_column(JSON, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    user = relationship("User")
-    __table_args__ = (UniqueConstraint("month", name="uq_awards_month"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+
+    # IMPORTANT : correspond à la table actuelle (texte 'YYYY-MM')
+    month = db.Column(db.String(7), nullable=False)  # ex: '2025-09'
+
+    score = db.Column(db.Float, nullable=False, default=0.0)
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("user_id", "month", name="uq_award_user_month"),
+    )
+
+    user = db.relationship("User", backref="awards")

@@ -1,4 +1,4 @@
-# app/routes/attendance.py
+ # app/routes/attendance.py
 from __future__ import annotations
 
 from math import radians, sin, cos, asin, sqrt
@@ -21,7 +21,7 @@ DEFAULT_SITE = {
     "ATTENDANCE_SITE_NAME": "ESGIS Avédji",
     "ATTENDANCE_SITE_LAT":  6.1727,
     "ATTENDANCE_SITE_LON":  1.2124,
-    "ATTENDANCE_SITE_RADIUS_M": 50,     # mètres
+    "ATTENDANCE_SITE_RADIUS_M": 10,     # mètres
     "ATTENDANCE_RESTRICT_TO_SITE": False
 }
 # =================================================================================================

@@ -6,7 +6,6 @@
   <div class="row justify-content-center">
     <div class="col-12 col-lg-9 col-xl-8">
       <div class="card shadow-sm overflow-hidden border-0 rounded-4">
-        <!-- + espace entre colonnes -->
         <div class="row g-5 align-items-stretch">
 
           <!-- Colonne formulaire -->
@@ -17,22 +16,42 @@
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 {% for cat, msg in messages %}
-                  <div class="alert alert-{{ cat }} py-2">{{ msg }}</div>
+                  {# map 'error' -> 'danger' pour Bootstrap #}
+                  {% set cat_bs = 'danger' if cat == 'error' else cat %}
+                  <div class="alert alert-{{ cat_bs }} py-2" role="alert">{{ msg }}</div>
                 {% endfor %}
               {% endif %}
             {% endwith %}
 
-            <form method="post" action="{{ url_for('auth.login') }}" class="vstack gap-3">
+            <form method="post" action="{{ url_for('auth.login') }}" class="vstack gap-3" novalidate>
+              {% if csrf_token is defined %}
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              {% endif %}
+
               <div>
-                <label class="form-label">Email</label>
-                <input type="email" name="email" class="form-control" required
-                       placeholder="votre Email" value="{{ request.form.get('email','') }}">
+                <label class="form-label" for="email">Email</label>
+                <input id="email" type="email" name="email" class="form-control"
+                       required placeholder="votre Email"
+                       autocomplete="username"
+                       value="{{ request.form.get('email','') }}">
               </div>
+
               <div>
-                <label class="form-label">Mot de passe</label>
-                <input type="password" name="password" class="form-control" required placeholder="••••••••">
+                <label class="form-label" for="password">Mot de passe</label>
+                <div class="input-group">
+                  <input id="password" type="password" name="password" class="form-control"
+                         required placeholder="••••••••" autocomplete="current-password" />
+                  <button type="button" class="btn btn-outline-secondary"
+                          id="togglePwd" aria-label="Afficher le mot de passe" tabindex="-1">👁</button>
+                </div>
+                <div class="d-flex justify-content-between mt-2">
+                  <small>
+                    <a href="{{ url_for('auth.forgot') }}">Mot de passe oublié&nbsp;?</a>
+                  </small>
+                </div>
               </div>
-              <button class="btn btn-primary mt-2 w-100">Se connecter</button>
+
+              <button class="btn btn-primary mt-2 w-100" type="submit">Se connecter</button>
             </form>
 
             {% if config.REGISTER_OPEN %}
@@ -44,14 +63,11 @@
 
           <!-- Colonne image (titre AU-DESSUS de l'image) -->
           <div class="col-md-6 d-none d-md-flex flex-column">
-            <!-- Titre bleu au-dessus -->
             <div class="px-4 pt-4">
               <div class="text-primary text-uppercase fw-bold fs-2" style="letter-spacing:.08em;">
                 BIENVENUE SUR RH PLATFORM
               </div>
             </div>
-
-            <!-- Image -->
             <div class="flex-fill px-4 pb-4 pt-2">
               <img
                 src="{{ url_for('static', filename='images/login-hero.jpg') }}"
@@ -65,4 +81,21 @@
     </div>
   </div>
 </div>
+
+<!-- Afficher/Masquer le mot de passe -->
+<script>
+  (function(){
+    const btn = document.getElementById('togglePwd');
+    const input = document.getElementById('password');
+    if (!btn || !input) return;
+    btn.addEventListener('click', function () {
+      input.type = input.type === 'password' ? 'text' : 'password';
+      this.setAttribute('aria-label', input.type === 'password'
+        ? 'Afficher le mot de passe'
+        : 'Masquer le mot de passe');
+      // Evite le focus visuel sur le bouton
+      this.blur();
+    });
+  })();
+</script>
 {% endblock %}

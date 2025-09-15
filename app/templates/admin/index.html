@@ -1,12 +1,107 @@
-
 {% extends "base.html" %}
 {% block title %}Admin - RH Platform{% endblock %}
-{% block content %}
-<h3 class="mb-3">Administration</h3>
 
-<div class="alert alert-info mb-3">
-  Raccourcis : 
-  <a class="btn btn-sm btn-outline-success" href="/admin/awards/">Employé du mois</a>
-  <a class="btn btn-sm btn-outline-secondary" href="/exports/">Exports</a>
+{% block content %}
+<h3 class="mb-3 d-flex align-items-center gap-3">
+  <span>Administration</span>
+</h3>
+
+{# On attend que la vue Python passe `endpoints=set(current_app.view_functions.keys())` #}
+{% set EP = endpoints if endpoints is defined else set() %}
+
+{% macro shortcut(ep_name, label, style='secondary') -%}
+  {% if ep_name in EP %}
+    <a class="btn btn-sm btn-outline-{{ style }}" href="{{ url_for(ep_name) }}">{{ label }}</a>
+  {% endif %}
+{%- endmacro %}
+
+<div class="alert alert-info d-flex align-items-center gap-2 mb-4" role="status" aria-live="polite">
+  <span class="me-2">Raccourcis :</span>
+
+  {{ shortcut('admin_users.index',        'Utilisateurs',            'primary') }}
+  {{ shortcut('departments.index',        'Départements',            'primary') }}
+  {{ shortcut('schedules.index',          'Horaires',                'primary') }}
+  {{ shortcut('overtime.policy',          'Règles HS',               'warning') }}
+  {{ shortcut('attendance.corrections',   'Corrections pointage',    'warning') }}
+  {{ shortcut('leaves.settings',          'Congés · Paramètres',     'success') }}
+  {{ shortcut('holidays.index',           'Jours fériés',            'success') }}
+  {{ shortcut('qr.admin',                 'QR / Terminaux',          'secondary') }}
+  {{ shortcut('exports_pdf.index',        'Exports PDF',             'secondary') }}
+  {{ shortcut('audit.index',              'Journal (audit)',         'dark') }}
+  {{ shortcut('settings.index',           'Paramètres système',      'dark') }}
+  {{ shortcut('jobs.index',               'Jobs planifiés',          'info') }}
+
+  {# Toujours utiles : si endpoints inconnus, on tente tout de même (fallback URL) #}
+  {% if 'awards.index' in EP %}
+    <a class="btn btn-sm btn-outline-success" href="{{ url_for('awards.index') }}">Employé du mois</a>
+  {% else %}
+    <a class="btn btn-sm btn-outline-success" href="/admin/awards/">Employé du mois</a>
+  {% endif %}
+
+  {% if 'exports.index' in EP %}
+    <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('exports.index') }}">Exports</a>
+  {% else %}
+    <a class="btn btn-sm btn-outline-secondary" href="/exports/">Exports</a>
+  {% endif %}
+</div>
+
+<div class="row g-3">
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Gestion RH</h5>
+        <div class="d-flex flex-wrap gap-2">
+          {{ shortcut('admin_users.index',      'Utilisateurs',        'primary') }}
+          {{ shortcut('departments.index',      'Départements',        'primary') }}
+          {{ shortcut('schedules.index',        'Horaires',            'primary') }}
+          {{ shortcut('leaves.settings',        'Congés · Paramètres', 'success') }}
+          {{ shortcut('holidays.index',         'Jours fériés',        'success') }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Temps & Heures sup</h5>
+        <div class="d-flex flex-wrap gap-2">
+          {{ shortcut('overtime.policy',        'Règles HS',            'warning') }}
+          {{ shortcut('attendance.corrections', 'Corrections pointage', 'warning') }}
+          {{ shortcut('qr.admin',               'QR / Terminaux',       'secondary') }}
+          {% if 'awards.index' in EP %}
+            <a class="btn btn-sm btn-outline-success" href="{{ url_for('awards.index') }}">Employé du mois</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Exports & Rapports</h5>
+        <div class="d-flex flex-wrap gap-2">
+          {% if 'exports.index' in EP %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('exports.index') }}">Exports</a>
+          {% endif %}
+          {{ shortcut('exports_pdf.index', 'Exports PDF', 'secondary') }}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+    <div class="card h-100">
+      <div class="card-body">
+        <h5 class="card-title mb-3">Système</h5>
+        <div class="d-flex flex-wrap gap-2">
+          {{ shortcut('settings.index', 'Paramètres système', 'dark') }}
+          {{ shortcut('audit.index',    'Journal (audit)',    'dark') }}
+          {{ shortcut('jobs.index',     'Jobs planifiés',     'info') }}
+        </div>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}

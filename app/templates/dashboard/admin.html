@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <h1 class="mb-3">Tableau de bord (Admin)</h1>
+  <p class="text-muted">Vue dédiée à l’administration (pas de pointage ici).</p>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-4">
+      <div class="card p-3 rounded-3 shadow-sm">
+        <div class="fw-semibold">Utilisateurs</div>
+        <div class="fs-2">{{ stats.users or 0 }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 rounded-3 shadow-sm">
+        <div class="fw-semibold">Départements</div>
+        <div class="fs-2">{{ stats.depts or 0 }}</div>
+      </div>
+    </div>
+    <div class="col-md-4">
+      <div class="card p-3 rounded-3 shadow-sm">
+        <div class="fw-semibold">Présents (aujourd’hui)</div>
+        <div class="fs-2">{{ stats.today or 0 }}</div>
+      </div>
+    </div>
+  </div>
+
+  {% if employee_of_month %}
+  <div class="card p-3 rounded-3 shadow-sm mb-4 d-flex flex-row align-items-center gap-3">
+    <div class="fs-3">🏅</div>
+    <div>
+      <div class="text-uppercase small text-muted">Employé·e du mois — {{ employee_of_month.period_label }}</div>
+      <div class="fw-bold">{{ employee_of_month.name }}</div>
+      <div class="text-muted">{{ employee_of_month.department }}</div>
+    </div>
+  </div>
+  {% endif %}
+
+  <h5 class="mb-2">Actions rapides</h5>
+  <div class="d-flex flex-wrap gap-2">
+    <a class="btn btn-primary" href="/admin/users">Gérer les utilisateurs</a>
+    <a class="btn btn-outline-primary" href="/admin/departments">Départements</a>
+    <a class="btn btn-outline-secondary" href="/admin/reports">Rapports</a>
+    <a class="btn btn-outline-secondary" href="/admin/settings">Paramètres</a>
+  </div>
+</div>
+{% endblock %}

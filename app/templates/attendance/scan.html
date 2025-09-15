@@ -15,12 +15,12 @@
         <div class="d-flex gap-2">
           <button type="button" id="btn-checkin" class="btn btn-success">
             <span class="spinner-border spinner-border-sm me-2 d-none" aria-hidden="true"></span>
-            <i class="bi bi-box-arrow-in-right me-1"></i> Check-in
+            <i class="bi bi-box-arrow-in-right me-1"></i> Entrée
           </button>
 
           <button type="button" id="btn-checkout" class="btn btn-danger">
             <span class="spinner-border spinner-border-sm me-2 d-none" aria-hidden="true"></span>
-            <i class="bi bi-box-arrow-right me-1"></i> Check-out
+            <i class="bi bi-box-arrow-right me-1"></i> Sortie
           </button>
         </div>
 
@@ -36,10 +36,10 @@
         <div class="text-muted mb-2">Liens QR rapides</div>
         <div class="d-grid gap-2">
           <a class="btn btn-outline-primary" href="{{ url_for('qr.gen_attendance_qr') }}?action=checkin">
-            <i class="bi bi-qr-code-scan me-1"></i> Générer QR Check-in
+            <i class="bi bi-qr-code-scan me-1"></i> Générer QR Enrée
           </a>
           <a class="btn btn-outline-secondary" href="{{ url_for('qr.gen_attendance_qr') }}?action=checkout">
-            <i class="bi bi-qr-code me-1"></i> Générer QR Check-out
+            <i class="bi bi-qr-code me-1"></i> Générer QR Sortie
           </a>
         </div>
       </div>

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 from typing import Dict, List, Tuple, Optional
 
-from sqlalchemy import func, and_, distinct, select, text, inspect
+from sqlalchemy import func, and_, distinct, select
 
 from ..extensions import db
 from ..models.user import User
@@ -200,8 +200,7 @@ def compute_month_scores(ym: str) -> List[ScoreRow]:
 
     # Tri avec bris d’égalité : score desc, présence desc, heures desc, id asc
     results.sort(
-        key=lambda r: (r.score, r.presence_rate, r.total_hours, -r.user_id),
-        reverse=True,
+        key=lambda r: (-r.score, -r.presence_rate, -r.total_hours, r.user_id)
     )
     return results
 
@@ -233,12 +232,21 @@ def pick_winner(ym: str, commit: bool = True) -> Optional[Award]:
     if existing:
         existing.user_id = top.user_id
         existing.score = float(top.score)
+        # 'details' est NOT NULL en base -> toujours l'alimenter
         existing.details = details
         if commit:
             db.session.commit()
         return existing
 
-    a = Award(month=ym, user_id=top.user_id, score=float(top.score), details=details)
+    # Création : passer 'details' au constructeur (NOT NULL)
+    a = Award(
+        month=ym,
+        user_id=top.user_id,
+        score=float(top.score),
+        details=details,
+        created_at=datetime.utcnow(), # type: ignore
+    )
+
     db.session.add(a)
     if commit:
         db.session.commit()

@@ -21,7 +21,7 @@ from ..models.user import User
 
 # Ces deux imports sont "meilleurs efforts"
 try:
-    from ..models.punch import Punch     # check_in, check_out, user_id, ...
+    from ..models.punch import Punch     # type: ignore # check_in, check_out, user_id, ...
 except Exception:  # pragma: no cover
     Punch = None  # type: ignore
 

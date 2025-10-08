@@ -9,7 +9,7 @@ from .utils import fmt_hours
 
 # --- formatage FR (Babel si dispo, sinon strftime) ---
 try:
-    from babel.dates import format_date as _format_date  # pip install Babel
+    from babel.dates import format_date as _format_date  # type: ignore # pip install Babel
 
     def fr_month_label(d):  # ex: "août 2025"
         return _format_date(d, format="LLLL yyyy", locale="fr_FR")
@@ -67,10 +67,9 @@ def create_app() -> Flask:
         pass
 
     # ---------- Config ----------
-    # 1) Config objet (lit .env si prévu dans config.py)
     app.config.from_object("config.Config")
 
-    # 2) Overrides ponctuels par ENV
+    # Overrides ENV
     if "SECRET_KEY" in os.environ:
         app.config["SECRET_KEY"] = os.environ["SECRET_KEY"]
     if "DATABASE_URL" in os.environ:
@@ -89,7 +88,7 @@ def create_app() -> Flask:
     app.config.setdefault("PUBLIC_BASE_URL", "http://127.0.0.1:5000")
     app.config.setdefault("TEMPLATES_AUTO_RELOAD", True)
 
-    # ---------- Heures supplémentaires : flags toujours présents ----------
+    # ---------- Heures supplémentaires : flags ----------
     mode = (
         (os.environ.get("OVERTIME_MODE") or app.config.get("OVERTIME_MODE") or "manual")
         .strip()
@@ -108,12 +107,12 @@ def create_app() -> Flask:
         AUTO_OVERTIME=bool(auto),
     )
 
-    # Rendre la config dispo dans Jinja (utile pour AUTO_OVERTIME, etc.)
+    # Rendre la config dispo dans Jinja
     app.jinja_env.globals.update(config=app.config)
 
     # ---------- Extensions ----------
     db.init_app(app)
-    # importer les modèles pour que Migrate les voie
+    # Importer les modèles pour que Migrate les voie
     from . import models  # noqa: F401
     migrate.init_app(app, db)
 
@@ -165,6 +164,19 @@ def create_app() -> Flask:
     except Exception as e:
         app.logger.debug("Attendance API non chargée: %s", e)
 
+    # (Sécurités supplémentaires si présents)
+    try:
+        from .routes.history import bp as history_bp  # si le module existe
+        _safe_register(app, history_bp)
+    except Exception as e:
+        app.logger.debug("History BP non chargé: %s", e)
+
+    try:
+        from .routes.exports import bp as exports_bp  # si le module existe
+        _safe_register(app, exports_bp)
+    except Exception as e:
+        app.logger.debug("Exports BP non chargé: %s", e)
+
     # ---------- Helpers & filtres Jinja ----------
     def url_public(path: str) -> str:
         base = app.config["PUBLIC_BASE_URL"].rstrip("/")
@@ -174,9 +186,19 @@ def create_app() -> Flask:
     app.jinja_env.filters["fr_month_label"] = fr_month_label
     app.jinja_env.filters["fmt_hours"] = fmt_hours  # {{ 1.75|fmt_hours }} -> "1 h 45"
 
+    # Helpers utilisables directement dans les templates (évite current_app undefined)
+    @app.context_processor
+    def _tpl_utils():
+        from flask import current_app, url_for
+        def has_endpoint(name: str) -> bool:
+            return name in current_app.view_functions
+        def safe_url_for(name: str, fallback: str = "/", **values) -> str:
+            return url_for(name, **values) if name in current_app.view_functions else fallback
+        return dict(has_endpoint=has_endpoint, safe_url_for=safe_url_for)
+
     # ---------- Jinja context (Role + Employé·e du mois + AUTO_OVERTIME) ----------
     from .models.enums import Role
-    from .models.award import Award  # <-- utilise la table awards comme source unique
+    from .models.award import Award  # table awards
 
     @app.context_processor
     def inject_enums_and_config():
@@ -212,7 +234,7 @@ def create_app() -> Flask:
                     "department": dept,
                     "period_label": per_label,
                     "period": award.month,
-                    "note": "",           # Award n'a pas de note → champ laissé vide
+                    "note": "",
                     "user_id": u.id,
                 }
         except Exception as e:

@@ -1,42 +1,15 @@
-# Environnements / IDE
-.venv/
-env/
-venv/
-.vscode/
-.idea/
-
-# Python
-__pycache__/
+﻿__pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pytest_cache/
-.coverage
-htmlcov/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build/Dist
-build/
-dist/
-*.egg-info/
-
-# Flask/Instance
-instance/
-*.log
-
-# Bases locales
-*.sqlite
-*.sqlite3
-*.db
-rh.db
-
-# Secrets
 .env
-.env.*
-
-# Alembic cache
-migrations/**/__pycache__/
-.vercel
+.venv/
+instance/
+*.sqlite
+*.db
+*.log
+.DS_Store
+.idea/
+.vscode/
+dist/
+build/

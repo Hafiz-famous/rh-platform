@@ -1,0 +1,15 @@
+{% if items|length == 0 %}
+<tr><td colspan="7" class="text-center text-muted py-4">Aucun résultat</td></tr>
+{% else %}
+  {% for r in items %}
+  <tr>
+    <td>{{ r.id }}</td>
+    <td>{{ r.user }}</td>
+    <td>{{ r.date }}</td>
+    <td>{{ r.in }}</td>
+    <td>{{ r.out }}</td>
+    <td>{{ r.hours }}</td>
+    <td class="text-truncate" style="max-width:18rem" title="{{ r.note }}">{{ r.note or '—' }}</td>
+  </tr>
+  {% endfor %}
+{% endif %}

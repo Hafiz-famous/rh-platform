@@ -3,7 +3,7 @@ import csv, io, json
 from datetime import date, datetime, time
 from typing import Iterable, Any, Optional
 
-from flask import Blueprint, Response, request, render_template, stream_with_context, current_app
+from flask import Blueprint, Response, request, render_template, stream_with_context, current_app, make_response
 from flask_login import login_required
 from sqlalchemy import literal
 
@@ -93,7 +93,7 @@ def _parse_date(val: Optional[str]) -> Optional[date]:
         return None
 
 
-# ----------- Exports -----------
+# ----------- Exports CSV -----------
 @bp.get("/attendance.csv")
 @login_required
 @roles_required(Role.ADMIN, Role.MANAGER)
@@ -259,3 +259,43 @@ def export_costs():
 
     headers = ["department", "cost"]
     return stream_csv(rows, headers, f"department_costs_{ym}.csv")
+
+
+# ----------- Rapport "PDF" (placeholder HTML) -----------
+@bp.get("/report/pdf", endpoint="report_pdf")
+@login_required
+@roles_required(Role.ADMIN, Role.MANAGER)
+def report_pdf():
+    """
+    Endpoint attendu par le template: url_for('exports.report_pdf')
+    Pour l'instant, renvoie un HTML minimal (placeholder).
+    Remplace par une génération PDF (WeasyPrint, xhtml2pdf, etc.) quand tu es prêt.
+    """
+    ym = request.args.get("month") or date.today().strftime("%Y-%m")
+    data = department_costs(ym) or []  # [{department, cost}]
+
+    # Si tu as un template Jinja, dé-commente:
+    # html = render_template("exports/report.html", month=ym, rows=data)
+
+    # Placeholder HTML inline pour éviter une dépendance PDF immédiate
+    rows_html = "\n".join(
+        f"<tr><td>{_serialize_cell(r.get('department'))}</td><td>{_serialize_cell(r.get('cost'))}</td></tr>"
+        for r in data
+    )
+    html = f"""
+    <!doctype html>
+    <html><head><meta charset="utf-8"><title>Rapport {ym}</title></head>
+    <body>
+      <h1>Rapport des coûts par département — {ym}</h1>
+      <table border="1" cellpadding="6" cellspacing="0">
+        <thead><tr><th>Département</th><th>Coût</th></tr></thead>
+        <tbody>{rows_html or '<tr><td colspan="2">Aucune donnée</td></tr>'}</tbody>
+      </table>
+    </body></html>
+    """
+
+    resp = make_response(html)
+    resp.headers["Content-Type"] = "text/html; charset=utf-8"
+    # Quand tu implémentes le PDF, remplace ci-dessus par 'application/pdf'
+    # et retourne les bytes PDF.
+    return resp

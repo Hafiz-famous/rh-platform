@@ -22,30 +22,77 @@
 
         <div class="collapse navbar-collapse" id="topnav">
           <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+            {# ------ Contexte nav ------- #}
+            {% set path = request.path %}
+            {% set is_admin = current_user.is_authenticated and (
+                (Role is defined and current_user.role in [Role.ADMIN, Role.MANAGER]) or
+                (Role is not defined and current_user.role in ['ADMIN','MANAGER'])
+            ) %}
+
             <li class="nav-item">
-              <a class="nav-link {% if request.path == '/' %}active{% endif %}" href="/">Dashboard</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.path.startswith('/attendance') %}active{% endif %}" href="/attendance/scan">Pointer</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.path.startswith('/leaves') %}active{% endif %}" href="/leaves/">Congés</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link {% if request.path.startswith('/overtime') %}active{% endif %}" href="/overtime/">Heures sup</a>
+              <a class="nav-link {{ 'active' if path == '/' else '' }}" href="/">Dashboard</a>
             </li>
 
-            {% if current_user.is_authenticated and current_user.has_role(Role.ADMIN, Role.MANAGER) %}
+            <li class="nav-item">
+              {# pointer/scan : fallback si l’endpoint n’existe pas #}
+              <a class="nav-link {{ 'active' if path.startswith('/attendance') else '' }}"
+                 href="{{ safe_url_for('attendance.scan', '/attendance/scan') }}">
+                 Pointer
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if path.startswith('/leaves') else '' }}"
+                 href="{{ safe_url_for('leaves.index', '/leaves/') }}">
+                 Congés
+              </a>
+            </li>
+
+            <li class="nav-item">
+              <a class="nav-link {{ 'active' if path.startswith('/overtime') else '' }}"
+                 href="{{ safe_url_for('overtime.index', '/overtime/') }}">
+                 Heures sup
+              </a>
+            </li>
+
+            {# -------- HISTORY (visible pour ADMIN/MANAGER) -------- #}
+            {% if is_admin %}
+              <li class="nav-item">
+                <a class="nav-link {{ 'active' if path.startswith('/history') else '' }}"
+                   href="{{ safe_url_for('history.index', '/history/') }}">
+                   HISTORY
+                </a>
+              </li>
+            {% endif %}
+
+            {# -------- EXPORTS (visible pour ADMIN/MANAGER) -------- #}
+            {% if is_admin %}
               <li class="nav-item dropdown">
-                <a class="nav-link dropdown-toggle {% if request.path.startswith('/admin') %}active{% endif %}"
+                <a class="nav-link dropdown-toggle {{ 'active' if path.startswith('/exports') else '' }}"
+                   href="#" id="exportsMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                  Exports
+                </a>
+                <ul class="dropdown-menu" aria-labelledby="exportsMenu">
+                  <li><a class="dropdown-item" href="{{ safe_url_for('exports.export_attendance', '/exports/attendance.csv') }}">Pointages (CSV)</a></li>
+                  <li><a class="dropdown-item" href="{{ safe_url_for('exports.export_overtime', '/exports/overtime.csv') }}">Heures sup (CSV)</a></li>
+                  <li><a class="dropdown-item" href="{{ safe_url_for('exports.export_leaves', '/exports/leaves.csv') }}">Congés (CSV)</a></li>
+                  <li><a class="dropdown-item" href="{{ safe_url_for('exports.export_costs', '/exports/department_costs.csv') }}">Coûts par département (CSV)</a></li>
+                  <li><hr class="dropdown-divider"></li>
+                  <li><a class="dropdown-item" href="{{ safe_url_for('exports.report_pdf', '/exports/report/pdf') }}">Rapport mensuel (PDF)</a></li>
+                </ul>
+              </li>
+            {% endif %}
+
+            {# -------- Admin -------- #}
+            {% if is_admin %}
+              <li class="nav-item dropdown">
+                <a class="nav-link dropdown-toggle {{ 'active' if path.startswith('/admin') else '' }}"
                    href="#" id="adminMenu" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                   Admin
                 </a>
                 <ul class="dropdown-menu" aria-labelledby="adminMenu">
-                  <!-- Garde un lien “console” générique sans dépendre des endpoints exacts -->
                   <li><a class="dropdown-item" href="/admin/">Console admin</a></li>
-                  <li><hr class="dropdown-divider"></li>
-                  <li><a class="dropdown-item" href="{{ url_for('admin_users.list_users') }}">Utilisateurs</a></li>
+                  <li><a class="dropdown-item" href="{{ safe_url_for('admin_users.list_users', '/admin/users/') }}">Utilisateurs</a></li>
                 </ul>
               </li>
             {% endif %}
@@ -61,9 +108,15 @@
               <span class="text-light small">
                 Bonjour, {{ current_user.first_name or current_user.email.split('@')[0] }}
               </span>
-              <a class="btn btn-sm btn-outline-light" href="{{ url_for('auth.logout') }}">Déconnexion</a>
+              <a class="btn btn-sm btn-outline-light"
+                 href="{{ safe_url_for('auth.logout', '/auth/logout') }}">
+                 Déconnexion
+              </a>
             {% else %}
-              <a class="btn btn-sm btn-light" href="{{ url_for('auth.login') }}">Connexion</a>
+              <a class="btn btn-sm btn-light"
+                 href="{{ safe_url_for('auth.login', '/auth/login') }}">
+                 Connexion
+              </a>
             {% endif %}
           </div>
         </div>

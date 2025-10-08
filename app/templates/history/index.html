@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Historique RH{% endblock %}
+
+{% block content %}
+<h3 class="mb-3 d-flex align-items-center gap-2">
+  <span>Historique (RH)</span>
+</h3>
+
+<form id="historyForm" class="row g-3 mb-3 align-items-end" onsubmit="return false;">
+  <div class="col-md-3">
+    <label class="form-label mb-1">Utilisateur</label>
+    <select id="f-user" name="user_id" class="form-select form-select-sm">
+      <option value="">Tous</option>
+      {% for u in users %}
+        {% set dn = (u.full_name if u.full_name else (u.first_name ~ ' ' ~ u.last_name)|trim) or (u.name or u.email or ('#' ~ u.id)) %}
+        <option value="{{ u.id }}">{{ dn }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  <div class="col-md-3">
+    <label class="form-label mb-1">Du</label>
+    <input id="f-from" name="start_date" type="date" class="form-control form-control-sm">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label mb-1">Au</label>
+    <input id="f-to" name="end_date" type="date" class="form-control form-control-sm">
+  </div>
+  <div class="col-md-3">
+    <label class="form-label mb-1">Rechercher</label>
+    <input id="f-q" name="q" type="search" class="form-control form-control-sm" placeholder="nom, email, note…">
+  </div>
+</form>
+
+<div class="d-flex flex-wrap gap-2 mb-3">
+  <div class="btn-group btn-group-sm" role="group" aria-label="Plages rapides">
+    <button type="button" data-range="7"  class="btn btn-outline-secondary">7j</button>
+    <button type="button" data-range="30" class="btn btn-outline-secondary">30j</button>
+    <button type="button" data-range="90" class="btn btn-outline-secondary">90j</button>
+    <button type="button" data-range="365" class="btn btn-outline-secondary">1 an</button>
+    <button type="button" data-range="all" class="btn btn-outline-secondary">Tout</button>
+  </div>
+  <div class="ms-auto">
+    <button id="btn-apply" type="button" class="btn btn-primary btn-sm">Appliquer</button>
+    <button id="btn-reset" type="button" class="btn btn-outline-secondary btn-sm">Réinitialiser</button>
+  </div>
+</div>
+
+<ul class="nav nav-tabs" role="tablist">
+  {% if OVERTIME_ENABLED %}
+    <li class="nav-item"><a href="#" class="nav-link {% if active_tab=='overtime' %}active{% endif %}" data-tab="overtime">Heures sup</a></li>
+  {% endif %}
+  {% if ATTENDANCE_ENABLED %}
+    <li class="nav-item"><a href="#" class="nav-link {% if active_tab=='attendance' %}active{% endif %}" data-tab="attendance">Pointages</a></li>
+  {% endif %}
+  {% if LEAVE_ENABLED %}
+    <li class="nav-item"><a href="#" class="nav-link {% if active_tab=='leaves' %}active{% endif %}" data-tab="leaves">Congés</a></li>
+  {% endif %}
+</ul>
+
+<div class="border-start border-end border-bottom p-3 rounded-bottom">
+  <div class="d-flex justify-content-between mb-2 align-items-center">
+    <div class="small text-muted" id="metaLabel"></div>
+    <div class="d-flex gap-2 align-items-center" id="ot-filters" hidden>
+      <select id="ot-status" class="form-select form-select-sm" style="width:auto">
+        <option value="">Tous statuts</option>
+        <option value="PENDING">En attente</option>
+        <option value="APPROVED">Approuvés</option>
+        <option value="REJECTED">Rejetés</option>
+      </select>
+      <select id="ot-origin" class="form-select form-select-sm" style="width:auto">
+        <option value="">Toutes origines</option>
+        <option value="auto">Automatique</option>
+        <option value="manual">Manuelle</option>
+      </select>
+      <a id="btn-export" class="btn btn-outline-primary btn-sm" href="#">Exporter CSV</a>
+    </div>
+    <div class="d-flex gap-2 align-items-center" id="default-export">
+      <a id="btn-export-default" class="btn btn-outline-primary btn-sm" href="#">Exporter CSV</a>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-sm align-middle" id="hist-table">
+      <thead class="table-light">
+        <tr id="theadRow"><th>ID</th><th>User</th><th>Type</th><th>Début</th><th>Fin</th><th class="text-end">Jours</th><th>Statut</th><th>Motif</th></tr>
+      </thead>
+      <tbody id="tbodyRows">
+        <tr id="loadingRow"><td colspan="8" class="text-center text-muted py-4">Chargement…</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div id="errorBox" class="alert alert-danger d-none mt-2 small"></div>
+</div>
+
+{% if csrf_token is defined %}<meta name="csrf-token" content="{{ csrf_token() }}">{% endif %}
+
+<script nonce="{{ csp_nonce }}">
+(() => {
+  const $  = (s, r=document)=>r.querySelector(s);
+  const $$ = (s, r=document)=>Array.from(r.querySelectorAll(s));
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.content || '';
+
+  // État courant
+  let activeTab = ($('.nav-link.active')?.dataset.tab) || 'leaves';
+  const state = { user_id:'', start_date:'', end_date:'', q:'', ot_status:'', ot_origin:'' };
+
+  // Helpers
+  function setDatesDefault(){
+    const now = new Date();
+    const to = new Date(now.getTime() - now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    const start = new Date(now); start.setDate(now.getDate()-29);
+    const from = new Date(start.getTime() - start.getTimezoneOffset()*60000).toISOString().slice(0,10);
+    $('#f-from').value = from; $('#f-to').value = to;
+    state.start_date = from; state.end_date = to;
+  }
+  function setHeadFor(tab){
+    const th = $('#theadRow');
+    if(tab==='attendance'){
+      th.innerHTML = '<th>ID</th><th>User</th><th>Date</th><th>Entrée</th><th>Sortie</th><th>Heures</th><th>Note</th>';
+    }else if(tab==='overtime'){
+      th.innerHTML = '<th>ID</th><th>User</th><th>Type</th><th>Début</th><th>Fin</th><th>Heures</th><th>Statut</th><th>Motif</th>';
+    }else{
+      th.innerHTML = '<th>ID</th><th>User</th><th>Type</th><th>Début</th><th>Fin</th><th class="text-end">Jours</th><th>Statut</th><th>Motif</th>';
+    }
+    // filtres spécifiques OT + bouton export
+    const otBox = $('#ot-filters');
+    const defBox = $('#default-export');
+    if(tab==='overtime'){ otBox.hidden=false; defBox.hidden=true; }
+    else { otBox.hidden=true; defBox.hidden=false; }
+  }
+  function params(extra={}){
+    const p = new URLSearchParams();
+    const merged = { ...state, ...extra };
+    Object.entries(merged).forEach(([k,v])=>{ if(v!=='' && v!=null) p.set(k, v); });
+    p.set('type', activeTab);
+    return p.toString();
+  }
+  function setExportHref(){
+    const q = params();
+    if(activeTab==='overtime'){ $('#btn-export').href = `/history/export?format=csv&${q}`; }
+    else { $('#btn-export-default').href = `/history/export?format=csv&${q}`; }
+  }
+
+  async function load(){
+    $('#errorBox').classList.add('d-none');
+    $('#tbodyRows').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Chargement…</td></tr>';
+    setHeadFor(activeTab);
+    setExportHref();
+    try{
+      const res = await fetch(`/history/search?${params()}`, { headers: { ...(csrf?{'X-CSRFToken':csrf}:{}) }});
+      if(!res.ok){ throw new Error('HTTP ' + res.status); }
+      const html = await res.text();
+      $('#tbodyRows').innerHTML = html;
+      const total = $('#tbodyRows').querySelectorAll('tr').length;
+      $('#metaLabel').textContent = `${total} lignes`;
+    }catch(err){
+      $('#tbodyRows').innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">Aucun résultat</td></tr>';
+      const box = $('#errorBox');
+      box.textContent = `Erreur de chargement (${err.message}).`;
+      box.classList.remove('d-none');
+    }
+  }
+
+  // Actions
+  $$('.nav-link[data-tab]').forEach(a=>{
+    a.addEventListener('click', (e)=>{
+      e.preventDefault();
+      $$('.nav-link[data-tab]').forEach(x=>x.classList.remove('active'));
+      a.classList.add('active');
+      activeTab = a.dataset.tab;
+      load();
+    });
+  });
+
+  $('#btn-apply').addEventListener('click', ()=>{
+    state.user_id   = $('#f-user').value || '';
+    state.start_date= $('#f-from').value || '';
+    state.end_date  = $('#f-to').value || '';
+    state.q         = $('#f-q').value.trim();
+    load();
+  });
+
+  $('#btn-reset').addEventListener('click', ()=>{
+    $('#f-user').value = ''; $('#f-from').value=''; $('#f-to').value=''; $('#f-q').value='';
+    state.user_id=state.start_date=state.end_date=state.q='';
+    $('#ot-status').value=''; $('#ot-origin').value=''; state.ot_status=''; state.ot_origin='';
+    setDatesDefault(); load();
+  });
+
+  // presets rapides
+  document.querySelectorAll('[data-range]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const v = btn.getAttribute('data-range');
+      if(v==='all'){ $('#f-from').value=''; $('#f-to').value=''; state.start_date=''; state.end_date=''; }
+      else{
+        const days = parseInt(v,10);
+        const now = new Date();
+        const to = new Date(now.getTime()-now.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        const start = new Date(now); start.setDate(now.getDate()-days+1);
+        const from = new Date(start.getTime()-start.getTimezoneOffset()*60000).toISOString().slice(0,10);
+        $('#f-from').value = from; $('#f-to').value = to;
+        state.start_date = from; state.end_date = to;
+      }
+      load();
+    });
+  });
+
+  // filtres spécifiques Heures sup (si backend les supporte)
+  $('#ot-status')?.addEventListener('change', e=>{ state.ot_status = e.target.value; load(); });
+  $('#ot-origin')?.addEventListener('change', e=>{ state.ot_origin = e.target.value; load(); });
+
+  // init : 30 derniers jours
+  setDatesDefault();
+  load();
+})();
+</script>
+{% endblock %}

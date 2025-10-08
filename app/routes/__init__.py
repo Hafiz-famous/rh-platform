@@ -1,4 +1,3 @@
-# app/routes/__init__.py
 from __future__ import annotations
 
 import os
@@ -46,7 +45,6 @@ def _extract_blueprints(mod: types.ModuleType, app: Flask) -> list[Blueprint]:
                 if isinstance(bp, Blueprint):
                     found.append(bp)
         except TypeError:
-            # obj n'est pas itérable et n'est pas un Blueprint
             pass
 
     # Attributs directs
@@ -71,7 +69,7 @@ def _extract_blueprints(mod: types.ModuleType, app: Flask) -> list[Blueprint]:
                     factory_name, mod.__name__, traceback.format_exc()
                 )
 
-    # Dédupliquer par nom
+    # Dédupli
     uniq: dict[str, Blueprint] = {}
     for bp in found:
         uniq.setdefault(bp.name, bp)
@@ -108,14 +106,11 @@ def _register_module(
             app.logger.error("%s\n%s", msg, traceback.format_exc())
             raise
         else:
-            app.logger.debug("%s", msg)  # pas de traceback pour les optionnels absents
+            app.logger.debug("%s", msg)
 
 
 def _autodiscover_modules(app: Flask, package: str) -> list[str]:
-    """
-    Retourne la liste des sous-modules trouvés dans 'package' (sans privés).
-    Ne charge pas les modules; ne retourne que les noms courts.
-    """
+    """Retourne la liste des sous-modules trouvés dans 'package' (sans privés)."""
     try:
         pkg = importlib.import_module(package)
         if not hasattr(pkg, "__path__"):
@@ -154,13 +149,14 @@ def register_blueprints(app: Flask) -> None:
         "qr",
         "awards",
         "exports",
+        "history",        # ← AJOUT : pour que /history/ existe
     ]
     optional = [
         "admin_users",
         "api_awards",
         "workflow",
         "admin_geofence",
-        "exports_pdf",
+        "exports_pdf",    # laissé en optionnel si tu gardes ce module
     ]
 
     # Surcharges env
@@ -188,7 +184,7 @@ def register_blueprints(app: Flask) -> None:
         _register_module(app, package, m, required=False, seen_bp_names=seen_bp_names)
 
     # Auto-discovery (facultatif)
-    if os.getenv("ROUTES_AUTODISCOVER", "0") in ("1", "true", "True"):
+    if os.getenv("ROUTES_AUTODISCOVER", "0").lower() in ("1", "true"):
         known = set(required) | set(optional) | disabled
         discovered = _autodiscover_modules(app, package)
         for m in discovered:

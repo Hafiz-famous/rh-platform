@@ -1,83 +1,66 @@
-# migrations/env.py
-import os
-from logging.config import fileConfig
-from sqlalchemy import engine_from_config, pool
+# alembic/env.py
+import os, sys
 from alembic import context
+
+# --- rendre importable "app" ---
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
 from app import create_app
 from app.extensions import db
-# Charge tous les modèles pour que metadata voie tout
-from app import models as _models  # noqa
 
-# --- Alembic config ---
 config = context.config
 
-# Logger Alembic (si alembic.ini présent)
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+# --- logging Alembic optionnel (ne pas planter si sections absentes) ---
+try:
+    from logging.config import fileConfig
+    from configparser import ConfigParser
+    if config.config_file_name:
+        _cp = ConfigParser()
+        _cp.read(config.config_file_name)
+        if _cp.has_section("loggers"):
+            fileConfig(config.config_file_name)
+except Exception:
+    pass
 
-# --- Crée et pousse l'app Flask ---
-app = create_app()
-app.app_context().push()
+# --- Boot Flask et lie Alembic à la config de BDD ---
+flask_app = create_app()
+with flask_app.app_context():
+    config.set_main_option("sqlalchemy.url", flask_app.config["SQLALCHEMY_DATABASE_URI"])
+    target_metadata = db.metadata
 
-# --- Choix/normalisation de l'URI DB ---
-def _normalize_sqlite_uri(app, uri: str | None) -> str | None:
-    if not uri or not uri.startswith("sqlite:///"):
-        return uri
-    path = uri[len("sqlite:///"):]
-    # Absolu -> normaliser seulement les slashes
-    if os.path.isabs(path):
-        return "sqlite:///" + path.replace("\\", "/")
-    # Relatif -> ancrer sur la racine du projet
-    abs_path = os.path.join(app.root_path, path)
-    return "sqlite:///" + os.path.abspath(abs_path).replace("\\", "/")
 
-db_uri = os.getenv("DATABASE_URL") or app.config.get("SQLALCHEMY_DATABASE_URI")
-db_uri = _normalize_sqlite_uri(app, db_uri)
-if db_uri:
-    config.set_main_option("sqlalchemy.url", db_uri)
-
-# --- Target metadata ---
-target_metadata = db.metadata
-
-# --- Offline ---
 def run_migrations_offline():
+    """Mode offline : pas d’engine, URL directe."""
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=db_uri,
+        url=url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
         compare_server_default=True,
-        render_as_batch=(db_uri or "").startswith("sqlite:///"),
     )
     with context.begin_transaction():
         context.run_migrations()
 
-# --- Online ---
+
 def run_migrations_online():
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",          # ✅ important
-        poolclass=pool.NullPool,
-    )
-    with connectable.connect() as connection:
-        is_sqlite = (connection.dialect.name == "sqlite")
-        if is_sqlite:
-            # pour respecter les FK pendant les migrations SQLite
-            connection.exec_driver_sql("PRAGMA foreign_keys=ON")
+    """Mode online : engine Flask **dans un app_context**."""
+    with flask_app.app_context():
+        connectable = db.engine
+        with connectable.connect() as connection:
+            context.configure(
+                connection=connection,
+                target_metadata=target_metadata,
+                compare_type=True,
+                compare_server_default=True,
+            )
+            with context.begin_transaction():
+                context.run_migrations()
 
-        context.configure(
-            connection=connection,
-            target_metadata=target_metadata,
-            compare_type=True,
-            compare_server_default=True,
-            render_as_batch=is_sqlite,  # facilite ALTER TABLE sous SQLite
-        )
-        with context.begin_transaction():
-            context.run_migrations()
 
-# --- Runner ---
 if context.is_offline_mode():
     run_migrations_offline()
 else:

@@ -1,0 +1,9 @@
+diff --git a/app/routes/__init__.py b/app/routes/__init__.py
+--- a/app/routes/__init__.py
++++ b/app/routes/__init__.py
+@@ -140,6 +140,7 @@ def register_blueprints(app: Flask) -> None:
+         "workflow",
+         "admin_geofence",
+         "exports_pdf",
++        "history",
+     ]
